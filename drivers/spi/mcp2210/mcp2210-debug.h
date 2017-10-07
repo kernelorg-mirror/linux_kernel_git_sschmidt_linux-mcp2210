@@ -34,9 +34,9 @@
 extern "C" {
 #endif /* __cplusplus */
 
-/* Do not define CONFIG_MCP2210_LOGGING_FAST_PATH unless you're debugging a timing-sensative a
+/* Do not define CONFIG_SPI_MCP2210_LOGGING_FAST_PATH unless you're debugging a timing-sensative a
  * problem and you need log spew to be as optimized as possible. */
-#ifdef CONFIG_MCP2210_LOGGING_FAST_PATH
+#ifdef CONFIG_SPI_MCP2210_LOGGING_FAST_PATH
 # define MCP2210_LOG_UNLIKELY(expr) (expr)
 #else
 # define MCP2210_LOG_UNLIKELY(expr) unlikely(expr)
@@ -67,7 +67,7 @@ extern "C" {
  * mcp2210_log - logs messages
  *
  * Logs messages but assures that debug messages are completely compiled out
- * when CONFIG_MCP2210_DEBUG is not enabled
+ * when CONFIG_SPI_MCP2210_DEBUG is not enabled
  */
 #define mcp2210_log(level, fmt, ...)					\
 	do {								\
@@ -77,8 +77,8 @@ extern "C" {
 		warn_on_non_const(_level);				\
 									\
 		/* compile-out debug messages unless			\
-		 * CONFIG_MCP2210_DEBUG is enabled */			\
-		if (!IS_ENABLED(CONFIG_MCP2210_DEBUG) && _level == _dbg)\
+		 * CONFIG_SPI_MCP2210_DEBUG is enabled */			\
+		if (!IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG) && _level == _dbg)\
 			break;						\
 									\
 		_mcp2210_log(level, fmt, ##__VA_ARGS__);		\
@@ -93,13 +93,13 @@ extern "C" {
 #define mcp2210_info(fmt, ...)	mcp2210_log(KERN_INFO,	fmt, ##__VA_ARGS__)
 #define mcp2210_debug(fmt, ...)	mcp2210_log(KERN_DEBUG,	fmt, ##__VA_ARGS__)
 
-#ifdef CONFIG_MCP2210_DEBUG
+#ifdef CONFIG_SPI_MCP2210_DEBUG
 # define MCP_ASSERT(cond) BUG_ON(!(cond))
 #else
 # define MCP_ASSERT(cond) do{}while(0)
 #endif
 
-#ifdef CONFIG_MCP2210_DEBUG_VERBOSE
+#ifdef CONFIG_SPI_MCP2210_DEBUG_VERBOSE
 void dump_dev(
 	const char *level, unsigned indent, const char *start,
 	const struct mcp2210_device *dev);
@@ -157,7 +157,7 @@ void _mcp2210_dump_urbs(struct mcp2210_device *dev, const char *level,
 static inline void mcp2210_dump_urbs(struct mcp2210_device *dev,
 				     const char *level, int urb_mask)
 {
-	if (IS_ENABLED(CONFIG_MCP2210_DEBUG) && dump_urbs)
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG) && dump_urbs)
 		_mcp2210_dump_urbs(dev, level, urb_mask);
 }
 
@@ -167,7 +167,7 @@ static inline void dump_cmd(const char *level, unsigned indent,
 			    const char *start,
 			    const struct mcp2210_cmd *cmd_head)
 {
-	if (IS_ENABLED(CONFIG_MCP2210_DEBUG_VERBOSE) && dump_cmds)
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG_VERBOSE) && dump_cmds)
 		_dump_cmd(level, indent, start, cmd_head);
 }
 
@@ -175,7 +175,7 @@ static inline void dump_cmd(const char *level, unsigned indent,
 #endif /* __KERNEL__ */
 
 /* both kernel & userspace functions */
-#ifdef CONFIG_MCP2210_DEBUG_VERBOSE
+#ifdef CONFIG_SPI_MCP2210_DEBUG_VERBOSE
 const char *get_cmd_str(u8 cmd);
 const char *get_sub_cmd_str(u8 sub_cmd);
 const char *get_status_str(u8 status);
@@ -219,7 +219,7 @@ void dump_mcp_msg(
 # define dump_usb_key_params(level, indent, start, x)	while(0){}
 # define dump_state(level, indent, start, x)		while(0){}
 # define dump_mcp_msg(level, indent, start, x)		while(0){}
-#endif /* CONFIG_MCP2210_DEBUG_VERBOSE */
+#endif /* CONFIG_SPI_MCP2210_DEBUG_VERBOSE */
 
 
 /* compile-time validation of struct mcp2210_msg */
@@ -227,8 +227,8 @@ static inline void msg_validate_size(void)
 {
 	struct mcp2210_msg validation_msg;
 
-	BUILD_BUG_ON(IS_ENABLED(CONFIG_MCP2210_CREEK)
-		&& (!IS_ENABLED(CONFIG_MCP2210_EEPROM)));
+	BUILD_BUG_ON(IS_ENABLED(CONFIG_SPI_MCP2210_CREEK)
+		&& (!IS_ENABLED(CONFIG_SPI_MCP2210_EEPROM)));
 
 	/* sanity checks on struct mcp2210_msg */
 	BUILD_BUG_ON(sizeof(struct mcp2210_msg) != MCP2210_BUFFER_SIZE);

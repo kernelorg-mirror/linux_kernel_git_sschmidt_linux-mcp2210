@@ -36,7 +36,7 @@
 #include "mcp2210.h"
 #include "mcp2210-debug.h"
 
-#ifdef CONFIG_MCP2210_CREEK
+#ifdef CONFIG_SPI_MCP2210_CREEK
 # include "mcp2210-creek.h"
 #endif
 
@@ -267,7 +267,7 @@ int validate_board_config(const struct mcp2210_board_config *src,
  * Creek configuration scheme functions
  */
 
-#ifdef CONFIG_MCP2210_CREEK
+#ifdef CONFIG_SPI_MCP2210_CREEK
 
 static const uint pow10[] = {
 	1,
@@ -579,7 +579,7 @@ error:
 	return ERR_PTR(-EPROTO);
 }
 
-#ifdef CONFIG_MCP2210_DEBUG
+#ifdef CONFIG_SPI_MCP2210_DEBUG
 static void creek_debug(const char *str, struct bit_creek *bs)
 {
 	printk(KERN_DEBUG "%s - %u\n", str, (uint)bs->pos);
@@ -1038,13 +1038,13 @@ exit_free:
 	return ret;
 }
 #endif /*__KERNEL__ */
-#endif /* CONFIG_MCP2210_CREEK */
+#endif /* CONFIG_SPI_MCP2210_CREEK */
 
 /******************************************************************************
  * Verbose debug support functions
  */
 
-#ifdef CONFIG_MCP2210_DEBUG_VERBOSE
+#ifdef CONFIG_SPI_MCP2210_DEBUG_VERBOSE
 struct code_desc {
 	u8 code;
 	const char *name;
@@ -1472,11 +1472,11 @@ void dump_dev(const char *level, unsigned indent, const char *start,
 
 	       "%s.dev_spinlock        = %slocked\n"
 	       "%s.queue_spinlock      = %slocked\n"
-#ifdef CONFIG_MCP2210_IOCTL
+#ifdef CONFIG_SPI_MCP2210_IOCTL
 	       "%s.io_mutex            = %slocked\n"
 #endif
 	       "%s.kref\n"
-#ifdef CONFIG_MCP2210_DEBUG
+#ifdef CONFIG_SPI_MCP2210_DEBUG
 	       "%s.manager_running     = %d\n"
 #endif
 	       "%s.cmd_queue           = {.next = %-p, .prev = %-p}\n"
@@ -1492,12 +1492,12 @@ void dump_dev(const char *level, unsigned indent, const char *start,
 		    ? "" : "un",
 	       ind, spin_is_locked((struct spinlock*)&dev->queue_spinlock)
 		    ? "" : "un",
-#ifdef CONFIG_MCP2210_IOCTL
+#ifdef CONFIG_SPI_MCP2210_IOCTL
 	       ind, mutex_is_locked((struct mutex*)&dev->io_mutex)
 		    ? "" : "un",
 #endif
 	       ind,
-#ifdef CONFIG_MCP2210_DEBUG
+#ifdef CONFIG_SPI_MCP2210_DEBUG
 	       ind, atomic_read(&dev->manager_running),
 #endif
 	       ind, dev->cmd_queue.next, dev->cmd_queue.prev,
@@ -1538,20 +1538,20 @@ void dump_dev(const char *level, unsigned indent, const char *start,
 		printk("%s%s.config = (null)\n", level, ind);
 
 	printk("%s%s.ctl_cmd\n"
-#ifdef CONFIG_MCP2210_EEPROM
+#ifdef CONFIG_SPI_MCP2210_EEPROM
 	       "%s.eeprom_spinlock     = %slocked\n"
 	       "%s.eeprom_state        = {TODO}\n"
 	       "%s.eeprom_cache        = {TODO}\n"
 #endif
 	       "%s.names\n"
-#ifdef CONFIG_MCP2210_GPIO
+#ifdef CONFIG_SPI_MCP2210_GPIO
 	       "%s.gpio\n"
 #endif
-#ifdef CONFIG_MCP2210_SPI
+#ifdef CONFIG_SPI_MCP2210_SPI
 	       "%s.spi_master          = %-p\n"
 	       "%s.chips[]             = {TODO}\n"
 #endif
-#ifdef CONFIG_MCP2210_IRQ
+#ifdef CONFIG_SPI_MCP2210_IRQ
 	       "%s.irq_lock            = %slocked\n"
 	       "%s.nr_irqs             = %u\n"
 	       "%s.irq_base            = %d\n"
@@ -1561,28 +1561,28 @@ void dump_dev(const char *level, unsigned indent, const char *start,
 	       "%s.last_poll_gpio      = %ld\n"
 	       "%s.last_poll_intr;     = %ld\n"
 	       "%s.interrupt_event_counter = %d\n"
-# ifdef CONFIG_MCP2210_GPIO
+# ifdef CONFIG_SPI_MCP2210_GPIO
 	       "%s.cmd_poll_gpio\n"
 # endif
 	       "%s.cmd_poll_intr\n"
 #endif
 	       "%s}\n",
        	       level, get_indent(indent),
-#ifdef CONFIG_MCP2210_EEPROM
+#ifdef CONFIG_SPI_MCP2210_EEPROM
 	       ind, spin_is_locked((struct spinlock*)&dev->eeprom_spinlock)
 		    ? "" : "un",
 	       ind,
 	       ind,
 #endif
 	       ind,
-#ifdef CONFIG_MCP2210_GPIO
+#ifdef CONFIG_SPI_MCP2210_GPIO
 	       ind,
 #endif
-#ifdef CONFIG_MCP2210_SPI
+#ifdef CONFIG_SPI_MCP2210_SPI
 	       ind, dev->spi_master,
 	       ind,
 #endif
-#ifdef CONFIG_MCP2210_IRQ
+#ifdef CONFIG_SPI_MCP2210_IRQ
 	       ind, mutex_is_locked((struct mutex*)&dev->irq_lock)
 		    ? "" : "un",
 	       ind, dev->nr_irqs,
@@ -1594,11 +1594,11 @@ void dump_dev(const char *level, unsigned indent, const char *start,
 	       ind, dev->last_poll_intr,
 	       ind, dev->interrupt_event_counter,
 
-# ifdef CONFIG_MCP2210_GPIO
+# ifdef CONFIG_SPI_MCP2210_GPIO
 	       ind,
 # endif
 	       ind,
-#endif /* CONFIG_MCP2210_IRQ */
+#endif /* CONFIG_SPI_MCP2210_IRQ */
 	       ind);
 }
 
@@ -2100,9 +2100,9 @@ void _dump_cmd(const char *level, unsigned indent, const char *start,
 }
 
 #endif /* __KERNEL__ */
-#endif /* CONFIG_MCP2210_DEBUG_VERBOSE */
+#endif /* CONFIG_SPI_MCP2210_DEBUG_VERBOSE */
 
-#if defined(__KERNEL__) && defined(CONFIG_MCP2210_DEBUG)
+#if defined(__KERNEL__) && defined(CONFIG_SPI_MCP2210_DEBUG)
 void _mcp2210_dump_urbs(struct mcp2210_device *dev, const char *level,
 			int urb_mask)
 {

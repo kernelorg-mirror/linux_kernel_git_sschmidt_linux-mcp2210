@@ -131,7 +131,7 @@
  * neither of which can be probed at the time the USB interface is probed
  * because the information to do so is not yet available.  This occurs either
  * when the user-EEPROM area has been read and decoded (when
- * CONFIG_MCP2210_CREEK is enabled) or when the configure ioctl command is
+ * CONFIG_SPI_MCP2210_CREEK is enabled) or when the configure ioctl command is
  * called from userspace.
  *
  * Delayed & Non-Atomic Commands
@@ -243,9 +243,9 @@ out of date info:
 #include "mcp2210.h"
 #include "mcp2210-debug.h"
 
-#ifdef CONFIG_MCP2210_CREEK
+#ifdef CONFIG_SPI_MCP2210_CREEK
 # include "mcp2210-creek.h"
-#endif /* CONFIG_MCP2210_CREEK */
+#endif /* CONFIG_SPI_MCP2210_CREEK */
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34)
 # define HAVE_USB_ALLOC_COHERENT 1
@@ -276,10 +276,10 @@ struct mcp2210_cmd_type mcp2210_cmd_types[MCP2210_CMD_TYPE_MAX];
  * Module parameters
  */
 
-int debug_level	  = CONFIG_MCP2210_DEBUG_INITIAL;
-int creek_enabled = IS_ENABLED(CONFIG_MCP2210_CREEK);
-int dump_urbs	  = CONFIG_MCP2210_DEBUG_INITIAL >= 7;
-int dump_cmds	  = CONFIG_MCP2210_DEBUG_INITIAL >= 7;
+int debug_level	  = CONFIG_SPI_MCP2210_DEBUG_INITIAL;
+int creek_enabled = IS_ENABLED(CONFIG_SPI_MCP2210_CREEK);
+int dump_urbs	  = CONFIG_SPI_MCP2210_DEBUG_INITIAL >= 7;
+int dump_cmds	  = CONFIG_SPI_MCP2210_DEBUG_INITIAL >= 7;
 uint pending_bytes_wait_threshold = 32;
 uint poll_delay_warn_secs = 0;
 
@@ -321,7 +321,7 @@ static struct usb_driver mcp2210_driver = {
 	.resume			= NULL,
 	.reset_resume		= NULL,
 	.id_table		= mcp2210_devices,
-	.supports_autosuspend	= IS_ENABLED(CONFIG_MCP2210_AUTOPM),
+	.supports_autosuspend	= IS_ENABLED(CONFIG_SPI_MCP2210_AUTOPM),
 };
 
 /******************************************************************************
@@ -367,7 +367,7 @@ static inline struct mcp2210_device *mcp2210_kref_to_dev(struct kref *kref)
 	return container_of(kref, struct mcp2210_device, kref);
 }
 
-#ifdef CONFIG_MCP2210_IOCTL
+#ifdef CONFIG_SPI_MCP2210_IOCTL
 static int mcp2210_open(struct inode *inode, struct file *file)
 {
 	struct mcp2210_device *dev;
@@ -384,7 +384,7 @@ static int mcp2210_open(struct inode *inode, struct file *file)
 	if (!(dev = usb_get_intfdata(intf)))
 		return -ENODEV;
 
-	if (IS_ENABLED(CONFIG_MCP2210_AUTOPM)) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_AUTOPM)) {
 		ret = usb_autopm_get_interface(intf);
 		if (ret && ret != -EACCES) {
 			mcp2210_err("usb_autopm_get_interface() failed:%de", ret);
@@ -407,7 +407,7 @@ static int mcp2210_release(struct inode *inode, struct file *file)
 
 	/* allow the device to be autosuspended */
 	mutex_lock(&dev->io_mutex);
-	if (IS_ENABLED(CONFIG_MCP2210_AUTOPM) && dev->intf)
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_AUTOPM) && dev->intf)
 		usb_autopm_put_interface(dev->intf);
 	mutex_unlock(&dev->io_mutex);
 
@@ -451,7 +451,7 @@ static struct usb_class_driver mcp2210_class = {
 	.minor_base =	0, /* FIXME: need a minor base from USB maintainer? */
 };
 
-#endif /* CONFIG_MCP2210_IOCTL */
+#endif /* CONFIG_SPI_MCP2210_IOCTL */
 
 /******************************************************************************
  * USB Driver functions
@@ -573,7 +573,7 @@ static void mcp2210_delete(struct kref *kref)
 	kfree(dev);
 }
 
-#ifdef CONFIG_MCP2210_CREEK
+#ifdef CONFIG_SPI_MCP2210_CREEK
 
 static int creek_configure(struct mcp2210_cmd *cmd, void *context) {
 	struct mcp2210_device *dev = cmd->dev;
@@ -707,7 +707,7 @@ static inline int eeprom_read_complete(struct mcp2210_cmd *cmd_head,
 {
 	return 0;
 }
-#endif /* CONFIG_MCP2210_CREEK */
+#endif /* CONFIG_SPI_MCP2210_CREEK */
 
 /* mcp2210_probe
  * can sleep, but keep it minimal as the USB core uses a single thread to probe
@@ -740,7 +740,7 @@ int mcp2210_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	INIT_LIST_HEAD(&dev->delayed_list);
 	spin_lock_init(&dev->dev_spinlock);
 	spin_lock_init(&dev->queue_spinlock);
-#ifdef CONFIG_MCP2210_EEPROM
+#ifdef CONFIG_SPI_MCP2210_EEPROM
 	spin_lock_init(&dev->eeprom_spinlock);
 #endif
 	mutex_init(&dev->io_mutex);
@@ -749,14 +749,14 @@ int mcp2210_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	init_timer(&dev->timer);
 	dev->timer.function = timer_callback;
 	dev->timer.data = (unsigned long)dev;
-#ifdef CONFIG_MCP2210_DEBUG
+#ifdef CONFIG_SPI_MCP2210_DEBUG
 	atomic_set(&dev->manager_running, 0);
 #endif
 
-#ifdef CONFIG_MCP2210_GPIO
+#ifdef CONFIG_SPI_MCP2210_GPIO
 #endif
 
-#ifdef CONFIG_MCP2210_SPI
+#ifdef CONFIG_SPI_MCP2210_SPI
 	/* mark current spi config as uninitialized */
 	dev->s.cur_spi_config = -1;
 #endif
@@ -780,10 +780,10 @@ int mcp2210_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	usb_set_intfdata(intf, dev);
 
 	/* no sleeping until we're done with all of our probing */
-	if (IS_ENABLED(CONFIG_MCP2210_AUTOPM))
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_AUTOPM))
 		usb_autopm_get_interface_no_resume(intf);
 
-#ifdef CONFIG_MCP2210_IOCTL
+#ifdef CONFIG_SPI_MCP2210_IOCTL
 	/* TODO: Do I need a "major number" from maintainer?
 	 * https://www.kernel.org/doc/htmldocs/usb/API-usb-register-dev.html
 	 */
@@ -792,7 +792,7 @@ int mcp2210_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		mcp2210_err("failed to register device %de\n", ret);
 		goto error_autopm_put;
 	}
-#endif /* CONFIG_MCP2210_IOCTL */
+#endif /* CONFIG_SPI_MCP2210_IOCTL */
 
 	/* TODO: set USB power to max until we know how much we need? */
 	dump_dev(KERN_INFO, 0, "This is the initial device state: ", dev);
@@ -827,7 +827,7 @@ int mcp2210_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		goto error_deregister_dev;
 	}
 
-	if (IS_ENABLED(CONFIG_MCP2210_CREEK) && creek_enabled) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_CREEK) && creek_enabled) {
 		/* read the first 4 bytes to see if we have our magic number */
 		ret = mcp2210_eeprom_read(dev, NULL, 0, 4, eeprom_read_complete,
 					  dev, GFP_KERNEL);
@@ -849,11 +849,11 @@ int mcp2210_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	return 0;
 
 error_deregister_dev:
-	if (IS_ENABLED(CONFIG_MCP2210_IOCTL))
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_IOCTL))
 		usb_deregister_dev(intf, &mcp2210_class);
 
 error_autopm_put:
-	if (IS_ENABLED(CONFIG_MCP2210_AUTOPM))
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_AUTOPM))
 		usb_autopm_put_interface(intf);
 	usb_set_intfdata(intf, NULL);
 
@@ -889,7 +889,7 @@ int mcp2210_configure(struct mcp2210_device *dev, struct mcp2210_board_config *n
 	might_sleep();
 	mcp2210_info();
 
-	if (IS_ENABLED(CONFIG_MCP2210_DEBUG)) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG)) {
 		BUG_ON(dev->spi_master);
 		BUG_ON(dev->is_gpio_probed);
 		BUG_ON(dev->config);
@@ -929,7 +929,7 @@ int mcp2210_configure(struct mcp2210_device *dev, struct mcp2210_board_config *n
 	mcp2210_add_ctl_cmd(dev, MCP2210_CMD_SET_CHIP_CONFIG, 0, &chip_settings,
 			    sizeof(chip_settings), false, GFP_KERNEL);
 
-	if (IS_ENABLED(CONFIG_MCP2210_GPIO)) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_GPIO)) {
 		mcp2210_info("----------probing GPIO----------\n");
 		ret = mcp2210_gpio_probe(dev);
 		if (ret) {
@@ -938,7 +938,7 @@ int mcp2210_configure(struct mcp2210_device *dev, struct mcp2210_board_config *n
 		}
 	}
 
-	if (IS_ENABLED(CONFIG_MCP2210_IRQ)) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_IRQ)) {
 		mcp2210_info("----------probing IRQ controller----------\n");
 		ret = mcp2210_irq_probe(dev);
 		if (ret) {
@@ -947,7 +947,7 @@ int mcp2210_configure(struct mcp2210_device *dev, struct mcp2210_board_config *n
 		}
 	}
 
-	if (IS_ENABLED(CONFIG_MCP2210_SPI)) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_SPI)) {
 		mcp2210_info("----------probing SPI----------\n");
 		ret = mcp2210_spi_probe(dev);
 		if (ret) {
@@ -960,10 +960,10 @@ int mcp2210_configure(struct mcp2210_device *dev, struct mcp2210_board_config *n
 		process_commands(dev, false, true);
 
 	/* Allow the device to auto-sleep now */
-	if (IS_ENABLED(CONFIG_MCP2210_AUTOPM))
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_AUTOPM))
 		usb_autopm_put_interface(dev->intf);
 
-	if (IS_ENABLED(CONFIG_MCP2210_DEBUG_VERBOSE)) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG_VERBOSE)) {
 		mcp2210_notice("Device sucessfully configured. New settings:\n");
 		dump_dev(KERN_NOTICE, 0, "", dev);
 	} else
@@ -1025,11 +1025,11 @@ void mcp2210_disconnect(struct usb_interface *intf)
 	mcp2210_gpio_remove(dev);
 	mcp2210_irq_remove(dev);
 
-#ifdef CONFIG_MCP2210_IOCTL
+#ifdef CONFIG_SPI_MCP2210_IOCTL
 	usb_deregister_dev(intf, &mcp2210_class);
 #endif
 	/* if never configured, make sure we release this */
-	if (IS_ENABLED(CONFIG_MCP2210_AUTOPM) && !dev->config)
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_AUTOPM) && !dev->config)
 		usb_autopm_put_interface(dev->intf);
 	usb_set_intfdata(intf, NULL);
 	kref_put(&dev->kref, mcp2210_delete);
@@ -1498,7 +1498,7 @@ static void delayed_work_callback(struct work_struct *work)
 	/* static const */ long TIMEOUT_URB = msecs_to_jiffies(750) + 1;
 	/* static const */ long TIMEOUT_HUNG = msecs_to_jiffies(8000);
 
-#ifdef CONFIG_MCP2210_DEBUG
+#ifdef CONFIG_SPI_MCP2210_DEBUG
 	if (atomic_inc_and_test(&dev->manager_running)) {
 		atomic_dec(&dev->manager_running);
 		mcp2210_crit("BUG: two instances of delayed work running!******");
@@ -1515,7 +1515,7 @@ static void delayed_work_callback(struct work_struct *work)
 		goto exit_unlock_dev;
 	}
 
-	if(IS_ENABLED(CONFIG_MCP2210_DEBUG)) {
+	if(IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG)) {
 		if (!dev->cur_cmd) {
 			if (dev->debug_chatter_count < 12) {
 				/* limit spam to 12 lines when idle */
@@ -1560,7 +1560,7 @@ static void delayed_work_callback(struct work_struct *work)
 			if (likely(age < TIMEOUT_URB)) {
 				goto exit_reschedule;
 			} else {
-#ifdef CONFIG_MCP2210_USB_QUIRKS
+#ifdef CONFIG_SPI_MCP2210_USB_QUIRKS
 #else
 #endif
 				/* timeout sending request, just fail the command */
@@ -1583,7 +1583,7 @@ exit_reschedule:
 		schedule_delayed_work(&dev->delayed_work, msecs_to_jiffies(4000));
 
 exit_unlock_dev:
-#ifdef CONFIG_MCP2210_DEBUG
+#ifdef CONFIG_SPI_MCP2210_DEBUG
 	atomic_dec(&dev->manager_running);
 #endif
 	spin_unlock_irqrestore(&dev->dev_spinlock, irqflags);
@@ -1613,7 +1613,7 @@ struct mcp2210_cmd *mcp2210_alloc_cmd(struct mcp2210_device *dev,
 	cmd->dev = dev;
 	cmd->type = type;
 	cmd->status = -EINPROGRESS;
-	if (IS_ENABLED(CONFIG_MCP2210_DEBUG)) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG)) {
 		cmd->node.next = LIST_POISON1;
 		cmd->node.prev = LIST_POISON2;
 	}
@@ -1794,7 +1794,7 @@ static void complete_urb(struct urb *urb)
 		return;
 	}
 
-	if (IS_ENABLED(CONFIG_MCP2210_DEBUG)) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG)) {
 		BUG_ON(!dev);
 		BUG_ON(!dev->cur_cmd);
 		BUG_ON(!dev->cur_cmd->type);
@@ -1825,14 +1825,14 @@ static void complete_urb(struct urb *urb)
 			goto exit_unlock;
 	}
 
-	if (IS_ENABLED(CONFIG_MCP2210_DEBUG)) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG)) {
 		/* make sure that we came up with is_dir_in correctly */
 		BUG_ON(ep->urb != urb);
 		BUG_ON(cmd->state != MCP2210_STATE_SUBMITTED);
 		BUG_ON(ep->state != MCP2210_STATE_SUBMITTED);
 	}
 
-	if (IS_ENABLED(CONFIG_MCP2210_DEBUG) && dump_urbs && is_dir_in) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG) && dump_urbs && is_dir_in) {
 		mcp2210_debug("-------------RESPONSE------------");
 		mcp2210_dump_urbs(dev, KERN_DEBUG, 2);
 	}
@@ -1879,7 +1879,7 @@ static void complete_urb(struct urb *urb)
 		cmd->state = MCP2210_STATE_COMPLETE;
 		if (type->complete_urb) {
 			ret = type->complete_urb(cmd);
-			if (IS_ENABLED(CONFIG_MCP2210_DEBUG_VERBOSE) && dump_cmds) {
+			if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG_VERBOSE) && dump_cmds) {
 				mcp2210_debug("--------FINAL COMMAND STATE--------");
 				dump_cmd(KERN_DEBUG, 0, "cmd: ", cmd);
 			}
@@ -1906,7 +1906,7 @@ bad:
 		if (!cmd->can_retry)
 			break;
 
-#ifdef CONFIG_MCP2210_USB_QUIRKS
+#ifdef CONFIG_SPI_MCP2210_USB_QUIRKS
 # define RETRY_COUNT 8
 #else
 # define RETRY_COUNT 1
@@ -1996,7 +1996,7 @@ static int submit_urbs(struct mcp2210_cmd *cmd, gfp_t gfp_flags)
 	if (unlikely(cmd->state != MCP2210_STATE_NEW))
 		mcp2210_warn("unexpected: cmd->state is %u", cmd->state);
 
-	if (IS_ENABLED(CONFIG_MCP2210_DEBUG_VERBOSE)) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG_VERBOSE)) {
 		mcp2210_debug("----------SUBMITTING----------\n");
 		mcp2210_dump_urbs(dev, KERN_DEBUG, 1);
 	}

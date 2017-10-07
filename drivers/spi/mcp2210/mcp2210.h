@@ -774,7 +774,7 @@ union mcp2210_cmd_any {
  * @submit_time: time URB was submitted (in jiffies)
  * @state:
  * @kill:	 non-zero if URB is being killed
- * @retry_count: used only with CONFIG_MCP2210_USB_QUIRKS
+ * @retry_count: used only with CONFIG_SPI_MCP2210_USB_QUIRKS
  * @is_dir_in:	The direction of this endpoint
  */
 struct mcp2210_endpoint {
@@ -834,11 +834,11 @@ struct mcp2210_device {
 
 	spinlock_t dev_spinlock;
 	spinlock_t queue_spinlock;
-#ifdef CONFIG_MCP2210_IOCTL
+#ifdef CONFIG_SPI_MCP2210_IOCTL
 	struct mutex io_mutex;
 #endif
 	struct kref kref;
-#ifdef CONFIG_MCP2210_DEBUG
+#ifdef CONFIG_SPI_MCP2210_DEBUG
 	atomic_t manager_running;
 #endif
 
@@ -864,24 +864,24 @@ struct mcp2210_device {
 	struct mcp2210_state s;
 	struct mcp2210_board_config *config;
 	struct mcp2210_cmd_ctl ctl_cmd;
-#ifdef CONFIG_MCP2210_EEPROM
+#ifdef CONFIG_SPI_MCP2210_EEPROM
 	spinlock_t eeprom_spinlock;
 	u8 eeprom_state[64];
 	u8 eeprom_cache[256];
 #endif
 	const char *names[MCP2210_NUM_PINS];
-#ifdef CONFIG_MCP2210_GPIO
+#ifdef CONFIG_SPI_MCP2210_GPIO
 	struct gpio_chip gpio;
 #endif
 
-#ifdef CONFIG_MCP2210_SPI
+#ifdef CONFIG_SPI_MCP2210_SPI
 	struct spi_master *spi_master;
 	struct spi_device *chips[MCP2210_NUM_PINS];
 #else
 	char spi_master; /* HACK: spi_master still referenced when disabeld */
 #endif
 
-#ifdef CONFIG_MCP2210_IRQ
+#ifdef CONFIG_SPI_MCP2210_IRQ
 	struct mutex irq_lock;
 	uint nr_irqs;
 	int irq_base;
@@ -893,11 +893,11 @@ struct mcp2210_device {
 	unsigned long last_poll_intr;
 	unsigned long suppress_poll_warn;
 	u16 interrupt_event_counter;
-# ifdef CONFIG_MCP2210_GPIO
+# ifdef CONFIG_SPI_MCP2210_GPIO
 	struct mcp2210_cmd_ctl cmd_poll_gpio;
 # endif
 	struct mcp2210_cmd_ctl cmd_poll_intr;
-#endif /* CONFIG_MCP2210_IRQ */
+#endif /* CONFIG_SPI_MCP2210_IRQ */
 };
 
 
@@ -939,7 +939,7 @@ void calculate_spi_settings(struct mcp2210_spi_xfer_settings *dest,
 /*****************************************************************************
  * mcp2210-ioctl.c
  */
-#ifdef CONFIG_MCP2210_IOCTL
+#ifdef CONFIG_SPI_MCP2210_IOCTL
 long mcp2210_ioctl(struct file *file, unsigned int request, unsigned long arg);
 #endif
 
@@ -947,31 +947,31 @@ long mcp2210_ioctl(struct file *file, unsigned int request, unsigned long arg);
 /*****************************************************************************
  * mcp2210-spi.c
  */
-#ifdef CONFIG_MCP2210_SPI
+#ifdef CONFIG_SPI_MCP2210_SPI
 int  mcp2210_spi_probe (struct mcp2210_device *dev);
 void mcp2210_spi_remove(struct mcp2210_device *dev);
 #else
 static inline int  mcp2210_spi_probe (struct mcp2210_device *dev) {return 0;}
 static inline void mcp2210_spi_remove(struct mcp2210_device *dev) {}
-#endif /* CONFIG_MCP2210_SPI */
+#endif /* CONFIG_SPI_MCP2210_SPI */
 
 
 /*****************************************************************************
  * mcp2210-gpio.c
  */
-#ifdef CONFIG_MCP2210_GPIO
+#ifdef CONFIG_SPI_MCP2210_GPIO
 int  mcp2210_gpio_probe (struct mcp2210_device *dev);
 void mcp2210_gpio_remove(struct mcp2210_device *dev);
 #else
 static inline int  mcp2210_gpio_probe (struct mcp2210_device *dev) {return 0;}
 static inline void mcp2210_gpio_remove(struct mcp2210_device *dev) {}
-#endif /* CONFIG_MCP2210_GPIO */
+#endif /* CONFIG_SPI_MCP2210_GPIO */
 
 
 /*****************************************************************************
  * mcp2210-eeprom.c
  */
-#ifdef CONFIG_MCP2210_EEPROM
+#ifdef CONFIG_SPI_MCP2210_EEPROM
 /* locks dev->eeprom_spinlock */
 int
 mcp2210_eeprom_read(struct mcp2210_device *dev, u8 *dest, u8 addr, u16 size,
@@ -990,12 +990,12 @@ static inline int
 mcp2210_eeprom_write(struct mcp2210_device *dev, const u8 *src, u8 addr,
 		     u16 size, mcp2210_complete_t complete, void *context,
 		     gfp_t gfp_flags) {return 0;}
-#endif /* CONFIG_MCP2210_EEPROM */
+#endif /* CONFIG_SPI_MCP2210_EEPROM */
 
 /*****************************************************************************
  * mcp2210-irq.c
  */
-#ifdef CONFIG_MCP2210_IRQ
+#ifdef CONFIG_SPI_MCP2210_IRQ
 int  mcp2210_irq_probe (struct mcp2210_device *dev);
 void mcp2210_irq_disable(struct mcp2210_device *dev);
 void mcp2210_irq_remove(struct mcp2210_device *dev);
@@ -1034,7 +1034,7 @@ static inline void mcp2210_irq_do_gpio(struct mcp2210_device *dev,
 				       u16 old_val, u16 new_val) {}
 static inline void mcp2210_irq_do_intr_counter(struct mcp2210_device *dev,
 					       u16 count) {}
-#endif /* CONFIG_MCP2210_IRQ */
+#endif /* CONFIG_SPI_MCP2210_IRQ */
 
 /*****************************************************************************
  * inlines

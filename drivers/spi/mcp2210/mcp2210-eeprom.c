@@ -25,7 +25,7 @@
 #include "mcp2210.h"
 #include "mcp2210-debug.h"
 
-#ifdef CONFIG_MCP2210_EEPROM
+#ifdef CONFIG_SPI_MCP2210_EEPROM
 
 static int eeprom_submit_prepare(struct mcp2210_cmd *cmd_head);
 static int eeprom_complete_urb(struct mcp2210_cmd *cmd_head);
@@ -346,4 +346,4 @@ int mcp2210_eeprom_write(struct mcp2210_device *dev, const u8 *src, u8 addr,
 	return -EINPROGRESS;
 }
 
-#endif /* CONFIG_MCP2210_EEPROM */
+#endif /* CONFIG_SPI_MCP2210_EEPROM */

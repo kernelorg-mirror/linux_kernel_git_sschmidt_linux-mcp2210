@@ -21,7 +21,7 @@
 #include "mcp2210.h"
 #include "mcp2210-debug.h"
 
-#ifdef CONFIG_MCP2210_IRQ
+#ifdef CONFIG_SPI_MCP2210_IRQ
 
 #include <linux/irq.h>
 
@@ -116,14 +116,14 @@ int mcp2210_irq_probe(struct mcp2210_device *dev)
 #endif
 	}
 
-#ifdef CONFIG_MCP2210_GPIO
+#ifdef CONFIG_SPI_MCP2210_GPIO
 	if (dev->poll_gpio) {
 		ctl_cmd_init(dev, &dev->cmd_poll_gpio,
 			     MCP2210_CMD_GET_PIN_VALUE, 0, NULL, 0, false);
 		dev->cmd_poll_gpio.head.complete = complete_poll;
 		mcp2210_add_cmd(&dev->cmd_poll_gpio.head, false);
 	}
-#endif /* CONFIG_MCP2210_GPIO */
+#endif /* CONFIG_SPI_MCP2210_GPIO */
 
 	if (dev->poll_intr) {
 		/* read and then reset */
@@ -294,4 +294,4 @@ static int complete_poll(struct mcp2210_cmd *cmd_head, void *context)
 	return -EINPROGRESS; /* tell process_commands not to free us */
 }
 
-#endif /* CONFIG_MCP2210_IRQ */
+#endif /* CONFIG_SPI_MCP2210_IRQ */

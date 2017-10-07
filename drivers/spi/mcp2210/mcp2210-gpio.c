@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#ifdef CONFIG_MCP2210_GPIO
+#ifdef CONFIG_SPI_MCP2210_GPIO
 
 #include <linux/gpio.h>
 #include <linux/completion.h>
@@ -51,7 +51,7 @@ static inline struct mcp2210_device *chip2dev(struct gpio_chip *chip) {
 }
 
 
-#ifdef CONFIG_MCP2210_IRQ
+#ifdef CONFIG_SPI_MCP2210_IRQ
 static int mcp2210_to_irq(struct gpio_chip *chip, unsigned offset)
 {
 	struct mcp2210_device *dev = container_of(chip, struct mcp2210_device, gpio);
@@ -382,7 +382,7 @@ static int mcp2210_get(struct gpio_chip *chip, unsigned offset)
 		val = 1 & (dev->s.chip_settings.gpio_value >> offset);
 		dir = 1 & (dev->s.chip_settings.gpio_direction >> offset);
 		last_poll = dev->last_poll_gpio;
-		if (IS_ENABLED(CONFIG_MCP2210_IRQ))
+		if (IS_ENABLED(CONFIG_SPI_MCP2210_IRQ))
 			stale_usecs = dev->config->stale_gpio_usecs;
 	spin_unlock_irqrestore(&dev->dev_spinlock, irqflags);
 
@@ -404,7 +404,7 @@ static int mcp2210_get(struct gpio_chip *chip, unsigned offset)
 
 	/* If the value was read within stale_usecs microseconds, then we just
 	 * return that value */
-	if (IS_ENABLED(CONFIG_MCP2210_IRQ) && stale_usecs && time_before(now,
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_IRQ) && stale_usecs && time_before(now,
 			last_poll + usecs_to_jiffies(stale_usecs))) {
 		return val;
 	}
@@ -425,4 +425,4 @@ static void mcp2210_set(struct gpio_chip *chip, unsigned offset, int value)
 	set_dir_and_value(chip, offset, MCP2210_GPIO_NO_CHANGE, value);
 }
 
-#endif /* CONFIG_MCP2210_GPIO */
+#endif /* CONFIG_SPI_MCP2210_GPIO */

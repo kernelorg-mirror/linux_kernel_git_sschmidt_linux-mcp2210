@@ -18,7 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#ifdef CONFIG_MCP2210_IOCTL
+#ifdef CONFIG_SPI_MCP2210_IOCTL
 
 #include <linux/uaccess.h>
 #include <linux/completion.h>
@@ -180,7 +180,7 @@ static int mcp2210_ioctl_complete(struct mcp2210_cmd *cmd_head, void *context)
 			memcpy(&idc->rep, dev->eps[EP_IN].buffer, 64);
 	}
 
-#ifdef CONFIG_MCP2210_EEPROM
+#ifdef CONFIG_SPI_MCP2210_EEPROM
 	case MCP2210_IOCTL_EEPROM: {
 		struct mcp2210_cmd_eeprom *cmd = (void *)cmd_head;
 
@@ -199,7 +199,7 @@ static int mcp2210_ioctl_complete(struct mcp2210_cmd *cmd_head, void *context)
 		}
 		break;
 	}
-#endif /* CONFIG_MCP2210_EEPROM */
+#endif /* CONFIG_SPI_MCP2210_EEPROM */
 
 	case MCP2210_IOCTL_CONFIG_GET:
 		/* this ioctl doesn't require a callback */
@@ -268,7 +268,7 @@ static long mcp2210_ioctl_cmd(struct mcp2210_device *dev, struct ioctl_result *r
 	return result->status;
 }
 
-#ifndef CONFIG_MCP2210_EEPROM
+#ifndef CONFIG_SPI_MCP2210_EEPROM
 static long mcp2210_ioctl_eeprom(struct mcp2210_device *dev, struct ioctl_result *result)
 {
 	mcp2210_warn("EEPROM support unavailable.");
@@ -308,7 +308,7 @@ static long mcp2210_ioctl_eeprom(struct mcp2210_device *dev, struct ioctl_result
 complete_ioctl:
 	return result->status;
 }
-#endif /* CONFIG_MCP2210_EEPROM */
+#endif /* CONFIG_SPI_MCP2210_EEPROM */
 
 static void reset_string_addr_single(const char **str, const char *min, const char *max, long diff)
 {
@@ -563,5 +563,5 @@ exit_nomem:
 
 	return -ENOMEM;
 }
-#endif /* CONFIG_MCP2210_IOCTL */
+#endif /* CONFIG_SPI_MCP2210_IOCTL */
 

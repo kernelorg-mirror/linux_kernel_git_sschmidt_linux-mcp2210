@@ -1,8 +1,4 @@
-#
-# MCP2210
-#
-
-config MCP2210
+config SPI_MCP2210
 	tristate "MCP2210 USB-to-SPI bridge"
 	depends on USB_SUPPORT
 	help
@@ -16,9 +12,9 @@ config MCP2210
 
 	  If unsure, say n.
 
-config MCP2210_IOCTL
+config SPI_MCP2210_IOCTL
 	bool "Enable ioctl control support"
-	depends on MCP2210
+	depends on SPI_MCP2210
 	default y
 	help
 	  Say yes here to build support for an ioctl control interface. This
@@ -28,10 +24,9 @@ config MCP2210_IOCTL
 
 	  If unsure, say y.
 
-config MCP2210_SPI
+config SPI_MCP2210_SPI
 	bool "Enable SPI support"
-	depends on MCP2210
-	select SPI
+	depends on SPI_MCP2210
 	default y
 	help
 	  Say yes here to build support for using the MCP2210 as an SPI master,
@@ -40,9 +35,9 @@ config MCP2210_SPI
 
 	  If unsure, say y.
 
-config MCP2210_GPIO
+config SPI_MCP2210_GPIO
 	bool "Enable GPIO support"
-	depends on MCP2210
+	depends on SPI_MCP2210
 	select GPIOLIB
 	default y
 	help
@@ -52,9 +47,9 @@ config MCP2210_GPIO
 
 	  If unsure, say y.
 
-config MCP2210_EEPROM
+config SPI_MCP2210_EEPROM
 	bool "Enable user-EEPROM support"
-	depends on MCP2210
+	depends on SPI_MCP2210
 	default y
 	help
 	  The MCP2210 has 256 bytes of user-EEPROM.  Enabling this builds
@@ -63,12 +58,11 @@ config MCP2210_EEPROM
 
 	  If unsure, say y.
 
-config MCP2210_CREEK
+config SPI_MCP2210_CREEK
 	bool "Creek auto-configuration support"
-	depends on MCP2210
-	select MCP2210_SPI
-	select MCP2210_GPIO
-	select MCP2210_EEPROM
+	depends on SPI_MCP2210
+	select SPI_MCP2210_GPIO
+	select SPI_MCP2210_EEPROM
 	default y
 	help
 	  Creek is an auto-configuration scheme that allows you to write the
@@ -80,9 +74,9 @@ config MCP2210_CREEK
 
 	  If unsure, say y.
 
-config MCP2210_IRQ
+config SPI_MCP2210_IRQ
 	bool "Interrupt controller support for MCP2210"
-	depends on MCP2210 && GENERIC_HARDIRQS
+	depends on SPI_MCP2210
 	default n
 	select GPIOLIB_IRQCHIP
 	help
@@ -92,9 +86,9 @@ config MCP2210_IRQ
 
 	  If unsure, say n.
 
-config MCP2210_DEBUG
+config SPI_MCP2210_DEBUG
 	bool "Enable debug messages"
-	depends on MCP2210
+	depends on SPI_MCP2210
 	help
 	  Saying no here removes all debug printk messages from the driver
 	  reducing saving (TODO) bytes.  If enabled, you will still have to
@@ -103,9 +97,9 @@ config MCP2210_DEBUG
 
 	  If unsure, say n.
 
-config MCP2210_DEBUG_VERBOSE
+config SPI_MCP2210_DEBUG_VERBOSE
 	bool "Enable verbose debug messages"
-	depends on MCP2210 && MCP2210_DEBUG
+	depends on SPI_MCP2210 && SPI_MCP2210_DEBUG
 	help
 	  If you say yes here you enable verbose debug messages (including dump
 	  of structs & messages).  This will increase the data & text by about
@@ -114,26 +108,26 @@ config MCP2210_DEBUG_VERBOSE
 
 	  If unsure, say n.
 
-config MCP2210_DEBUG_INITIAL
+config SPI_MCP2210_DEBUG_INITIAL
 	int "Initial debug level"
-	depends on MCP2210
+	depends on SPI_MCP2210
 	default 7
 	help
 	  The initial debug level for this driver.  You can change via
 	  /sys/module/mcp2210/parameters/debug_level.
 
-config MCP2210_USB_QUIRKS
+config SPI_MCP2210_USB_QUIRKS
 	bool "Enable work-arounds for quirky USB host drivers"
-	depends on MCP2210
+	depends on SPI_MCP2210
 	help
 	  Builds countermeasures for quirky USB host drivers like the BCM2835
 	  used on the Raspberry Pi to help it function better.
 
 	  If unsure, say n.
 
-config MCP2210_AUTOPM
+config SPI_MCP2210_AUTOPM
 	bool "Enable autosuspend via pm runtime (in development)"
-	depends on MCP2210
+	depends on SPI_MCP2210
 	select PM
 	help
 	  Saying yes here enables autosuspend support via the pm runtime

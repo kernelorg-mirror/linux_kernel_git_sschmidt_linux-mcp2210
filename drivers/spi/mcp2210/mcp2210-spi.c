@@ -26,7 +26,7 @@
 #include "mcp2210.h"
 #include "mcp2210-debug.h"
 
-#ifdef CONFIG_MCP2210_SPI
+#ifdef CONFIG_SPI_MCP2210_SPI
 
 /* The non-queued mechanism will supposedly be phased out in the future.
  * However, we don't get any benefit from the new API since we just queue
@@ -198,7 +198,7 @@ static void mcp2210_spi_probe_async(struct work_struct *work) {
 		chip->bits_per_word = cfg->spi.bits_per_word;
 
 #ifdef HAVE_SPI_CS_GPIO
-# ifdef CONFIG_MCP2210_GPIO
+# ifdef CONFIG_SPI_MCP2210_GPIO
 		if (cfg->spi.use_cs_gpio)
 			chip->cs_gpio = dev->gpio.base + cfg->spi.cs_gpio;
 		else
@@ -206,7 +206,7 @@ static void mcp2210_spi_probe_async(struct work_struct *work) {
 			chip->cs_gpio = -EINVAL;
 #endif /* HAVE_SPI_CS_GPIO */
 
-#ifdef CONFIG_MCP2210_IRQ
+#ifdef CONFIG_SPI_MCP2210_IRQ
 		if (cfg->has_irq)
 			chip->irq = dev->irq_base + cfg->irq;
 		else
@@ -369,7 +369,7 @@ static int queue_msg(struct mcp2210_device *dev, struct spi_message *msg,
 	mcp2210_debug("Start new transfer (pin %d)\n", pin);
 
 	/* debug-only sanity checks */
-	if (IS_ENABLED(CONFIG_MCP2210_DEBUG)) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG)) {
 		if (pin_config->mode != MCP2210_PIN_SPI) {
 			mcp2210_err("Attempt to SPI on non-spi pin!");
 			return -EINVAL;
@@ -408,7 +408,7 @@ static int queue_msg(struct mcp2210_device *dev, struct spi_message *msg,
 			xfer_chain_size = 0;
 
 		/* debug-only sanity checks */
-		if (IS_ENABLED(CONFIG_MCP2210_DEBUG)) {
+		if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG)) {
 			if (!(xfer->tx_buf || xfer->rx_buf)) {
 				mcp2210_err("spi_transfer w/o tx or rx buffer");
 				return -EINVAL;
@@ -664,7 +664,7 @@ static void spi_complete_ctl_cmd(struct mcp2210_cmd_spi_msg *cmd)
 	/* always returns zero, so ignoring return value */
 	cc->type->complete_urb(cc);
 
-	if (IS_ENABLED(CONFIG_MCP2210_DEBUG) && dump_cmds) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG) && dump_cmds) {
 		mcp2210_debug("----CONTROL COMMAND RESPONSED----");
 
 		cc->state = MCP2210_STATE_COMPLETE;
@@ -691,7 +691,7 @@ static int spi_complete_urb(struct mcp2210_cmd *cmd_head)
 	u8 pin = cmd->spi->chip_select;
 	u8 len;
 
-	if (IS_ENABLED(CONFIG_MCP2210_DEBUG)) {
+	if (IS_ENABLED(CONFIG_SPI_MCP2210_DEBUG)) {
 		BUG_ON(!cmd_head->dev);
 		BUG_ON(pin > 8);
 		BUG_ON(dev->config->pins[pin].mode != MCP2210_PIN_SPI);
@@ -856,4 +856,4 @@ static int spi_complete_cmd(struct mcp2210_cmd *cmd_head, void *context)
 	return 0;
 }
 
-#endif /* CONFIG_MCP2210_SPI */
+#endif /* CONFIG_SPI_MCP2210_SPI */
