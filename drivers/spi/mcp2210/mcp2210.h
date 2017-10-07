@@ -31,7 +31,6 @@
 # include "out-of-tree-autoconf.h"
 #endif
 
-#ifdef __KERNEL__
 # include <linux/kernel.h>
 # include <linux/version.h>
 # include <linux/types.h>
@@ -44,33 +43,6 @@
 # include <linux/gpio.h>
 # include <linux/timer.h>
 # include <linux/jiffies.h>
-
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
-#  include <linux/kconfig.h>
-# endif
-
-/* BUILD_BUG_ON broken somewhere prior to 3.0 */
-# if LINUX_VERSION_CODE < KERNEL_VERSION(3,0,0) && defined(BUILD_BUG_ON)
-#  undef BUILD_BUG_ON
-# endif
-
-/* spin_is_locked broken somewhere prior to 2.6.34 */
-# include <linux/spinlock.h>
-# if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,34) && defined(spin_is_locked)
-#  undef spin_is_locked
-# endif
-
-#else
-# include <stdint.h>
-# include <stddef.h>
-# include <stdlib.h>
-# include <stdio.h>
-# include <string.h>
-# include <errno.h>
-# include <sys/types.h>
-# include <sys/ioctl.h>
-# include <assert.h>
-#endif /* __KERNEL__ */
 
 #ifdef __cplusplus
 extern "C" {
