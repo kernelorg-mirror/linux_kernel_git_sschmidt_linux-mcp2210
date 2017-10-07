@@ -53,6 +53,8 @@ if SPI_MASTER
 
 comment "SPI Master Controller Drivers"
 
+source "drivers/spi/mcp2210/Kconfig"
+
 config SPI_ALTERA
 	tristate "Altera SPI Controller"
 	help
