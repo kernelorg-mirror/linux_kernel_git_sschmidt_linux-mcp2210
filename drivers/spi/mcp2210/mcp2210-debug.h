@@ -29,11 +29,6 @@
 # include <linux/device.h>
 #endif
 
-
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 /* Do not define CONFIG_SPI_MCP2210_LOGGING_FAST_PATH unless you're debugging a timing-sensative a
  * problem and you need log spew to be as optimized as possible. */
 #ifdef CONFIG_SPI_MCP2210_LOGGING_FAST_PATH
