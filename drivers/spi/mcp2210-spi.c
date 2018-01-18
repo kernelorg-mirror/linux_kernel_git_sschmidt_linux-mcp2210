@@ -167,7 +167,6 @@ static int next_mcp2210_spi_request(void *data, u8 *request)
 static void mcp2210_spi_response(void *data, u8 *response) 
 {
 	struct mcp2210_spi_message *mcp_msg = data;
-	int x;
 	u8 len;
 	
 	//printk("Received data\n\n");
@@ -268,7 +267,7 @@ static void mcp2210_spi_cleanup(struct spi_device *spi)
 
 static struct spi_board_info demo_spi_devices[] = {
 	{
-		.modalias = "spidev",
+		.modalias = "mrf24j40",
 		.chip_select = 0,
 		.max_speed_hz = MCP2210_MAX_SPEED,
 		.bus_num = 0,

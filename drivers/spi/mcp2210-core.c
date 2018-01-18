@@ -14,7 +14,8 @@
 
 #include <linux/usb.h>
 #include "mcp2210.h"
-#include "../../hid/usbhid/usbhid.h"
+#include "../hid/usbhid/usbhid.h"
+#include <linux/module.h>
 
 struct info_command {
 	int id;
@@ -65,7 +66,6 @@ void mcp2210_info_command_interrupted(void *data) {
 }
 
 static void mcp2210_process_commnds(struct mcp2210_device *dev) {
-	int ret = 0;
 	//printk("mcp2210_process_commnds\n");
 	
 	// Get the next request from the current command
@@ -80,7 +80,7 @@ static void mcp2210_process_commnds(struct mcp2210_device *dev) {
 }
 
 static void mcp2210_output_command(struct work_struct *work) {
-	struct mcp2210_device *dev = container_of(work, struct mcp2210_device, command_work);
+	//struct mcp2210_device *dev = container_of(work, struct mcp2210_device, command_work);
 }
 
 static void mcp2210_output_command_atomic(struct mcp2210_device *dev) {
@@ -137,7 +137,7 @@ static void mcp2210_output_command_atomic(struct mcp2210_device *dev) {
 			field->value[cnt] = dev->requeust_buffer[cnt + 1];
 		}
 				
-		usbhid_submit_report(dev->hid, report, USB_DIR_OUT);
+		hid_hw_request(dev->hid, report, HID_REQ_SET_REPORT);
 		//dev->hid->hiddev_report_event(dev->hid, report);
 		//dev->hid->hid_output_raw_report(dev->hid, dev->requeust_buffer, MCP2210_BUFFER_SIZE, HID_OUTPUT_REPORT);		
 		
@@ -168,7 +168,6 @@ err_free_field:
 	kfree(field);
 err_free_report:
 	kfree(report);
-err:
 	pending = dev->current_command->requests_pending;
 	if(pending == 0) {
 		if(dev->current_command->interrupted)
@@ -256,7 +255,7 @@ static int mcp2210_probe(struct hid_device *hdev,
 {
 	int ret;
 	struct mcp2210_device *dev;
-	struct info_command *cmd_data;
+	//struct info_command *cmd_data;
 	
 	dev = kzalloc(sizeof(struct mcp2210_device), GFP_KERNEL);
 	if (!dev)
@@ -384,24 +383,5 @@ static struct hid_driver mcp2210_driver = {
 	.remove = mcp2210_remove
 };
 
-static int __init mcp2210_init(void)
-{
-	int ret;
-	printk("mcp2210_init\n");
-
-	ret = hid_register_driver(&mcp2210_driver);
-	if (ret)
-		printk(KERN_ERR "can't register mcp2210 driver\n");
-
-	return ret;
-}
-
-static void __exit mcp2210_exit(void)
-{
-	printk("mcp2210_exit\n");
-	hid_unregister_driver(&mcp2210_driver);
-}
-
-module_init(mcp2210_init);
-module_exit(mcp2210_exit);
+module_hid_driver(mcp2210_driver);
 MODULE_LICENSE("GPL");
