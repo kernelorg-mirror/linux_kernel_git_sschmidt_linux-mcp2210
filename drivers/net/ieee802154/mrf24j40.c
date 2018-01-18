@@ -1071,6 +1071,7 @@ static int mrf24j40_hw_init(struct mrf24j40 *devrec)
 {
 	u32 irq_type;
 	int ret;
+	printk("%s 1\n", __func__);
 
 	/* Initialize the device.
 		From datasheet section 3.2: Initialization. */
@@ -1134,6 +1135,7 @@ static int mrf24j40_hw_init(struct mrf24j40 *devrec)
 	if (ret)
 		goto err_ret;
 
+	printk("%s 2\n", __func__);
 	udelay(192);
 
 	/* Set RX Mode. RXMCR<1:0>: 0x0 normal, 0x1 promisc, 0x2 error */
@@ -1141,6 +1143,7 @@ static int mrf24j40_hw_init(struct mrf24j40 *devrec)
 	if (ret)
 		goto err_ret;
 
+	printk("%s 3\n", __func__);
 	if (spi_get_device_id(devrec->spi)->driver_data == MRF24J40MC) {
 		/* Enable external amplifier.
 		 * From MRF24J40MC datasheet section 1.3: Operation.
@@ -1334,25 +1337,30 @@ static int mrf24j40_probe(struct spi_device *spi)
 		goto err_register_device;
 	}
 
+	dev_info(&spi->dev, "probe() 1\n");
 	ret = mrf24j40_hw_init(devrec);
 	if (ret)
 		goto err_register_device;
 
+	dev_info(&spi->dev, "probe() 2\n");
 	mrf24j40_phy_setup(devrec);
+	dev_info(&spi->dev, "probe() 3\n");
 
 	/* request IRQF_TRIGGER_LOW as fallback default */
 	irq_type = irq_get_trigger_type(spi->irq);
 	if (!irq_type)
 		irq_type = IRQF_TRIGGER_LOW;
 
+	dev_info(&spi->dev, "probe() 4\n");
 	ret = devm_request_irq(&spi->dev, spi->irq, mrf24j40_isr,
 			       irq_type, dev_name(&spi->dev), devrec);
 	if (ret) {
 		dev_err(printdev(devrec), "Unable to get IRQ");
 		goto err_register_device;
 	}
+	dev_info(&spi->dev, "probe() 5\n");
 
-	dev_dbg(printdev(devrec), "registered mrf24j40\n");
+	dev_info(printdev(devrec), "registered mrf24j40\n");
 	ret = ieee802154_register_hw(devrec->hw);
 	if (ret)
 		goto err_register_device;
