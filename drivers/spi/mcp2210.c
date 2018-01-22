@@ -284,53 +284,6 @@ static struct spi_board_info demo_spi_devices[] = {
 	}
 };
 
-int mcp2210_spi_probe(struct mcp2210_device *dev) {
-	int ret;
-	struct spi_master	*master;
-	struct mcp2210_spi *ms;
-	
-	ret = -ENOMEM;
-	master = spi_alloc_master(&dev->hid->dev, sizeof *ms);	
-	if (!master)
-		goto out_free;
-	
-	master->bus_num = -1;
-	master->num_chipselect = 4;
-	master->setup = mcp2210_spi_setup;
-	master->transfer = mcp2210_spi_transfer;
-	master->cleanup = mcp2210_spi_cleanup;
-	master->mode_bits = SPI_CPOL | SPI_CPHA;
-		
-	ms = spi_master_get_devdata(master);
-	ms->dev = dev;	
-	ms->master = master;
-	dev->spi_data = ms;
-	
-	ret = spi_register_master(master);
-	
-	demo_spi_devices[0].bus_num = master->bus_num;
-	printk("mcp2210 spi master registered bus number %d\n", demo_spi_devices[0].bus_num);
-	
-	spi_new_device(master, demo_spi_devices);
-	
-	if (ret)
-		goto out_free;
-	
-	return 0;
-	
-out_free:
-	spi_master_put(master);
-	return ret;
-}
-
-void mcp2210_spi_remove(struct mcp2210_device *dev)
-{
-	struct mcp2210_spi *ms = dev->spi_data;
-	struct spi_master	*master = ms->master;	
-	
-	spi_unregister_master(master);
-}
-
 static void mcp2210_output_command_atomic(struct mcp2210_device *dev);
 
 int next_mcp2210_info_command(void *data, u8 *request) {
@@ -535,6 +488,8 @@ static int mcp2210_probe(struct hid_device *hdev,
 	int ret;
 	struct mcp2210_device *dev;
 	//struct info_command *cmd_data;
+	struct spi_master	*master;
+	struct mcp2210_spi *ms;
 	
 	dev = kzalloc(sizeof(struct mcp2210_device), GFP_KERNEL);
 	if (!dev)
@@ -574,14 +529,34 @@ static int mcp2210_probe(struct hid_device *hdev,
 		goto err_free;
 	}	
 
-#if 0	
-	ret = mcp2210_spi_probe(dev);
-	if(ret < 0) {
+	ret = -ENOMEM;
+	master = spi_alloc_master(&dev->hid->dev, sizeof *ms);	
+	if (!master)
 		goto err_power;
-	}
-#endif
 	
-	/*
+	master->bus_num = -1;
+	master->num_chipselect = 4;
+	master->setup = mcp2210_spi_setup;
+	master->transfer = mcp2210_spi_transfer;
+	master->cleanup = mcp2210_spi_cleanup;
+	master->mode_bits = SPI_CPOL | SPI_CPHA;
+		
+	ms = spi_master_get_devdata(master);
+	ms->dev = dev;	
+	ms->master = master;
+	dev->spi_data = ms;
+	
+	ret = spi_register_master(master);
+	
+	demo_spi_devices[0].bus_num = master->bus_num;
+	printk("mcp2210 spi master registered bus number %d\n", demo_spi_devices[0].bus_num);
+	
+	spi_new_device(master, demo_spi_devices);
+	
+	if (ret)
+		goto err_power;
+	
+		/*
 	cmd_data = kzalloc(sizeof(struct info_command), GFP_KERNEL);
 	if (!cmd_data)
 		return -ENOMEM;
@@ -612,6 +587,7 @@ err_power:
 	if (hdev->ll_driver->power)
 		hdev->ll_driver->power(hdev, PM_HINT_NORMAL);
 	hdev->ll_driver->close(hdev);		
+	spi_master_put(master);
 err_free:
 	kfree(dev);
 	return ret;
@@ -622,6 +598,8 @@ static void mcp2210_remove(struct hid_device *hdev)
 	struct mcp2210_device *dev = hid_get_drvdata(hdev);
 	struct list_head *pos, *q, *request_pos, *request_q;
 	struct mcp2210_command *tmp;
+	struct mcp2210_spi *ms = dev->spi_data;
+	struct spi_master	*master = ms->master;	
 	
 	list_for_each_safe(pos, q, &dev->command_list){
 		tmp = list_entry(pos, struct mcp2210_command, node);
@@ -637,7 +615,7 @@ static void mcp2210_remove(struct hid_device *hdev)
 		kfree(tmp);
 	}
 	
-	//mcp2210_spi_remove(dev);
+	spi_unregister_master(master);
 
 	if (hdev->ll_driver->power)
 		hdev->ll_driver->power(hdev, PM_HINT_NORMAL);
