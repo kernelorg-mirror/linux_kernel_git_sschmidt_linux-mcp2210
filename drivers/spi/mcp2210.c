@@ -331,7 +331,6 @@ void mcp2210_spi_remove(struct mcp2210_device *dev)
 	spi_unregister_master(master);
 }
 
-
 static void mcp2210_output_command_atomic(struct mcp2210_device *dev);
 
 int next_mcp2210_info_command(void *data, u8 *request) {
@@ -530,32 +529,6 @@ static void mcp2210_free_request(struct mcp2210_request_list *list_node) {
 	kfree(list_node);
 }
 
-// Called when data is received from the mcp2210
-static int mcp2210_raw_event(struct hid_device *hdev, struct hid_report *report,
-			u8 *data, int size)
-{
-	struct mcp2210_device *dev = hid_get_drvdata(hdev);
-	struct mcp2210_request_list *list_node;
-	
-	if(size == MCP2210_BUFFER_SIZE && dev->current_command) {	
-		spin_lock(&dev->command_lock);		
-		//printk("mcp2210_raw_event lock\n");
-		list_node = list_first_entry(&dev->current_command->request_list, struct mcp2210_request_list, node);
-		mcp2210_free_request(list_node);
-		
-		dev->current_command->data_received(dev->current_command->data, data);
-		dev->current_command->requests_pending--;
-		
-		mcp2210_process_commnds(dev);
-		//printk("mcp2210_raw_event unlock\n");
-		spin_unlock(&dev->command_lock);		
-		return 1;
-	}
-	
-	return 0;
-}
-
-// Called when a new mcp2210 device is added
 static int mcp2210_probe(struct hid_device *hdev,
 		const struct hid_device_id *id)
 {
@@ -644,7 +617,6 @@ err_free:
 	return ret;
 }
 
-// Called when a new mcp2210 device is removed
 static void mcp2210_remove(struct hid_device *hdev)
 {
 	struct mcp2210_device *dev = hid_get_drvdata(hdev);
@@ -688,7 +660,6 @@ MODULE_DEVICE_TABLE(hid, mcp2210_devices);
 static struct hid_driver mcp2210_driver = {
 	.name = "mcp2210",
 	.id_table = mcp2210_devices,
-	.raw_event = mcp2210_raw_event,
 	.probe = mcp2210_probe,
 	.remove = mcp2210_remove
 };
