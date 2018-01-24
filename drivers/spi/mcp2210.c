@@ -3,9 +3,6 @@
  *
  *  Copyright (c) 2013 Mathew King <mking@trilithic.com> for Trilithic, Inc
  *
- */
-
-/*
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
  * Software Foundation; either version 2 of the License, or (at your option)
@@ -13,21 +10,27 @@
  */
 
 #include <linux/usb.h>
-#include "mcp2210.h"
-#include "../hid/usbhid/usbhid.h"
 #include <linux/module.h>
 #include <linux/spi/spi.h>
 
-struct info_command {
-	int id;
-	int count;
-	int response_count;
-	int done;
+#include <linux/types.h>
+#include <linux/device.h>
+
+#define USB_VENDOR_ID_MICROCHIP		0x04d8
+#define USB_DEVICE_ID_MCP2210		0x00de
+
+#define MCP2210_BUFFER_SIZE		64
+#define MCP2210_MAX_SPEED	(12 * 1000 * 1000)
+
+struct mcp2210_device {
+	struct device *dev;
+	struct spi_master *master;
+	u8 requeust_buffer[MCP2210_BUFFER_SIZE];
+	void *spi_data;
 };
 
 struct mcp2210_spi {
 	struct mcp2210_device *dev;
-	struct spi_master	*master;
 };
 
 struct mcp2210_spi_message {
@@ -42,203 +45,6 @@ struct mcp2210_spi_message {
 	unsigned int kill;
 	struct list_head *next;
 };
-
-static void fill_u32(u8 *ptr, u32 data) {
-	ptr[0] = data & 0xFF;
-	ptr[1] = (data >> 8) & 0xFF;
-	ptr[2] = (data >> 16) & 0xFF;
-	ptr[3] = (data >> 24) & 0xFF;
-}
-
-
-static void fill_u16(u8 *ptr, u16 data) {
-	ptr[0] = data & 0xFF;
-	ptr[1] = (data >> 8) & 0xFF;
-}
-
-static void mcp2210_spi_populate_transfer_settings(u8 *request, struct mcp2210_spi_message *mcp_msg) 
-{
-	u32 bit_rate = mcp_msg->spi->max_speed_hz;
-	u16 idle_cs = ~(0x01 << mcp_msg->spi->chip_select);
-	u16 active_cs = 0xff;
-	u16 cs_to_data_delay = 5; // 5 * 100us delay
-	u16 last_byte_to_cs = 5;
-	u16 delay_between_bytes = 0;
-	u16 tansaction_bytes = mcp_msg->current_transfer->len;
-	
-	if(mcp_msg->current_transfer->speed_hz)
-		bit_rate = mcp_msg->current_transfer->speed_hz;
-		
-	if(bit_rate > MCP2210_MAX_SPEED)
-		bit_rate = MCP2210_MAX_SPEED;
-	
-	// Set SPI Transfer Settings
-	request[0] = 0x40;
-	
-	fill_u32(request + 4, bit_rate);
-	fill_u16(request + 8, idle_cs);
-	fill_u16(request + 10, active_cs);
-	fill_u16(request + 12, cs_to_data_delay);
-	fill_u16(request + 14, last_byte_to_cs);
-	fill_u16(request + 16, delay_between_bytes);
-	fill_u16(request + 18, tansaction_bytes);
-	
-	request[20] = mcp_msg->spi->mode & 0x03;
-}
-
-static int next_mcp2210_spi_request(void *data, u8 *request) 
-{
-	struct mcp2210_spi_message *mcp_msg = data;
-	u32 len;
-	
-	// Only send one command at a time
-	if((mcp_msg->current_transfer && !mcp_msg->settings_set) || mcp_msg->tx_in_process) {
-		return 0;
-	}
-	
-	// Check for done	
-	if(mcp_msg->next == &mcp_msg->msg->transfers || mcp_msg->msg->status) {
-		//printk("mcp2210_spi Message done %d\n", mcp_msg->msg->status);
-		mcp_msg->msg->complete(mcp_msg->msg->context);
-		kfree(mcp_msg);
-		return 0;
-	}
-	
-	// Check for start of transfer
-	if(!mcp_msg->current_transfer) {		
-		//printk("mcp2210_spi Start new transfer \n");
-		mcp_msg->current_transfer = list_entry(mcp_msg->next, struct spi_transfer, transfer_list);
-		mcp_msg->tx_pos = 0;
-		mcp_msg->rx_pos = 0;
-		mcp_msg->tx_in_process = 0;
-		mcp_msg->tx_bytes_in_process = 0;
-		mcp_msg->settings_set = 0;
-		mcp2210_spi_populate_transfer_settings(request, mcp_msg);
-		print_msg(request);
-		return 1;
-	}
-	
-	// Write spi transfer command
-	if(mcp_msg->tx_pos < mcp_msg->current_transfer->len) {
-		len = mcp_msg->current_transfer->len - mcp_msg->tx_pos;
-		
-		if(len > MCP2210_BUFFER_SIZE - 4)
-			len = MCP2210_BUFFER_SIZE - 4;
-		
-		request[0] = 0x42;
-		request[1] = len & 0xff;
-		
-		if(mcp_msg->current_transfer->tx_buf)
-			memcpy(request + 4, mcp_msg->current_transfer->tx_buf + mcp_msg->tx_pos, len);
-			
-		mcp_msg->tx_pos += len;
-		mcp_msg->tx_bytes_in_process = len;
-		mcp_msg->tx_in_process++;
-		
-		if(len == 0) {
-			printk("ERROR: we are sending 0 bytes %d \n", mcp_msg->current_transfer->len);
-		}
-		
-		//printk("mcp2210_spi send %d bytes \n", len);
-		
-		print_msg(request);
-		return 1;
-	}
-	
-	if(mcp_msg->rx_pos < mcp_msg->current_transfer->len) {
-		// All data is sent but we need to wait and receive the rest		
-		request[0] = 0x42;
-		request[1] = 0;
-		
-		mcp_msg->tx_in_process++;
-		mcp_msg->kill++;
-		
-		if(mcp_msg->kill > 50) 
-		{
-			mcp_msg->msg->status = -EIO;
-			request[0] = 0x11;
-			//printk("mcp2210_spi kill the transfer \n");
-		}
-		
-		//printk("mcp2210_spi request rx bytes \n");
-		
-		print_msg(request);
-		return 1;
-	}
-	
-	if(mcp_msg->tx_pos == mcp_msg->current_transfer->len) {
-		//printk("mcp2210_spi All tx bytes sent\n");
-	}
-	
-	return 0;
-}
-
-static void mcp2210_spi_response(void *data, u8 *response) 
-{
-	struct mcp2210_spi_message *mcp_msg = data;
-	u8 len;
-	
-	//printk("Received data\n\n");
-	
-	print_msg(response);
-	
-	// This is the settings response
-	if(!mcp_msg->settings_set) {
-		//printk("mcp2210_spi Sent spi settings\n");
-		mcp_msg->settings_set = 1;
-		return;
-	}
-	
-	// This is a transfer response
-	mcp_msg->tx_in_process--;
-		
-	// The message has an error just return
-	if(mcp_msg->msg->status)
-		return;
-	
-	if(response[1] == 0xf8) {
-		// data not accepted we need to resend
-		mcp_msg->tx_pos -= mcp_msg->tx_bytes_in_process;
-		mcp_msg->tx_bytes_in_process = 0;
-		return;
-	}
-	
-	if(response[1]) {
-		// Error response
-		mcp_msg->msg->status = -response[1];
-		return;
-	}	
-	
-	len = response[2];
-	
-	if(len) {
-		// There is data to receive
-		if(mcp_msg->current_transfer->rx_buf) 
-			memcpy(mcp_msg->current_transfer->rx_buf + mcp_msg->rx_pos, response + 4, len);
-			
-		mcp_msg->rx_pos += len;
-		mcp_msg->msg->actual_length += len;
-	}
-	
-	// Data was accepted so clear in process
-	mcp_msg->tx_bytes_in_process = 0;
-	
-	if(mcp_msg->rx_pos == mcp_msg->current_transfer->len) {
-		// Transfer is done move next
-		//printk("mcp2210_spi All rx bytes read\n");
-		mcp_msg->current_transfer = NULL;
-		mcp_msg->next = mcp_msg->next->next;
-	}
-}
-
-static void mcp2210_spi_interrupted(void *data) 
-{
-	struct mcp2210_spi_message *mcp_msg = data;
-
-	mcp_msg->msg->status = -ESHUTDOWN;
-	mcp_msg->msg->complete(mcp_msg->msg->context);
-	kfree(mcp_msg);
-}
 
 static int mcp2210_spi_setup(struct spi_device *spi)
 {
@@ -263,8 +69,6 @@ static int mcp2210_spi_transfer(struct spi_device *spi, struct spi_message *msg)
 	mcp_msg->next = msg->transfers.next;
 	msg->status = 0;
 	
-	mcp2210_add_command(ms->dev, mcp_msg, next_mcp2210_spi_request, mcp2210_spi_response, mcp2210_spi_interrupted);
-	
 	return 0;
 }
 
@@ -274,373 +78,92 @@ static void mcp2210_spi_cleanup(struct spi_device *spi)
 	ms = spi_master_get_devdata(spi->master);
 }
 
-static struct spi_board_info demo_spi_devices[] = {
-	{
-		.modalias = "spidev",
+static int mcp2210_probe(struct usb_interface *intf,
+		const struct usb_device_id *id)
+{
+	struct mcp2210_device *dev;
+	struct mcp2210_spi *ms;
+	struct spi_master *master;
+	int ret;
+	static struct spi_board_info board_info = {
+		.modalias = "mrf24j40",
+		.bus_num = 0,
 		.chip_select = 0,
 		.max_speed_hz = MCP2210_MAX_SPEED,
-		.bus_num = 0,
 		.mode = SPI_MODE_3,
-	}
-};
-
-static void mcp2210_output_command_atomic(struct mcp2210_device *dev);
-
-int next_mcp2210_info_command(void *data, u8 *request) {
-	struct info_command *cmd_data = data;
-	
-	if(cmd_data->done) {
-		kfree(cmd_data);
-		return 0;
-	}
-	
-	if(cmd_data->count >= 10) {
-		return 0;
-	}
-	
-	cmd_data->count++;	
-	request[0] = 0x41;
-	
-	return 1;
-}
-
-void next_mcp2210_info_command_data(void *data, u8 *response) {
-	struct info_command *cmd_data = data;
-
-	cmd_data->response_count++;
-	if(cmd_data->response_count >= 10) {		
-		cmd_data->done = 1;
-		printk("next_mcp2210_info_command done %d: %d\n", cmd_data->id, cmd_data->response_count);
-	}
-	
-	if(response[0] != 0x41) {		
-		printk("wrong command \n");
-	}
-}
-
-void mcp2210_info_command_interrupted(void *data) {
-
-	printk("mcp2210_info_command_interrupted\n");
-}
-
-static void mcp2210_process_commnds(struct mcp2210_device *dev) {
-	//printk("mcp2210_process_commnds\n");
-	
-	// Get the next request from the current command
-	if(dev->current_command) {		
-		mcp2210_output_command_atomic(dev);
-	}
-	
-	if(!dev->current_command && !list_empty(&dev->command_list)) {	
-		dev->current_command = list_first_entry(&dev->command_list, struct mcp2210_command, node);
-		mcp2210_process_commnds(dev);		
-	}
-}
-
-static void mcp2210_output_command(struct work_struct *work) {
-	//struct mcp2210_device *dev = container_of(work, struct mcp2210_device, command_work);
-}
-
-static void mcp2210_output_command_atomic(struct mcp2210_device *dev) {
-	struct hid_report *report;
-	struct hid_field *field;
-	struct mcp2210_request_list *list_node;
-	int cnt, pending;
-	
-	int num;
-	//printk("mcp2210_output_command\n");
-	
-	if(!dev->current_command) {
-		printk("Error: no current command\n");		
-		return;
-	}
-		
-	memset(dev->requeust_buffer, 0, MCP2210_BUFFER_SIZE);
-	num = dev->current_command->next_request(dev->current_command->data, dev->requeust_buffer);
-	while(num > 0) {
-		dev->current_command->requests_pending++;
-				
-		report = kzalloc(sizeof(struct hid_report), GFP_ATOMIC);
-		if(!report) 
-			goto err_free_report;
-			
-		field = kzalloc(sizeof(struct hid_field), GFP_ATOMIC);
-		if(!field) 
-			goto err_free_field;
-			
-		field->value = kzalloc((MCP2210_BUFFER_SIZE - 1) * sizeof(__s32), GFP_ATOMIC);
-		if(!field->value) 
-			goto err_free_value;
-			
-		list_node = kzalloc(sizeof(struct mcp2210_request_list), GFP_ATOMIC);
-		if(!list_node) 
-			goto err_free_node;
-		
-		report->id = dev->requeust_buffer[0];
-		report->type = HID_OUTPUT_REPORT;
-		report->field[0] = field;
-		report->maxfield = 1;
-		report->size = (MCP2210_BUFFER_SIZE - 1) << 3;
-		report->device = dev->hid;
-		
-		field->logical_minimum = 0;
-		field->logical_maximum = 255;
-		field->report_count = MCP2210_BUFFER_SIZE - 1;
-		field->report_size = 8;
-		
-		list_node->report = report;
-		list_add_tail(&list_node->node, &dev->current_command->request_list);
-		
-		for(cnt = 0; cnt < (MCP2210_BUFFER_SIZE - 1); cnt++) {
-			field->value[cnt] = dev->requeust_buffer[cnt + 1];
-		}
-				
-		hid_hw_request(dev->hid, report, HID_REQ_SET_REPORT);
-		//dev->hid->hiddev_report_event(dev->hid, report);
-		//dev->hid->hid_output_raw_report(dev->hid, dev->requeust_buffer, MCP2210_BUFFER_SIZE, HID_OUTPUT_REPORT);		
-		
-		if(dev->current_command->requests_pending >= 63) 
-			break;
-			
-		memset(dev->requeust_buffer, 0, MCP2210_BUFFER_SIZE);
-		num = dev->current_command->next_request(dev->current_command->data, dev->requeust_buffer);
-	}
-		
-	//printk("Sending %d commands\n", dev->current_command->requests_pending);		
-	if(dev->current_command->requests_pending == 0) {
-		// The command has finished so remove it
-		list_del(&dev->current_command->node);
-			
-		kfree(dev->current_command);
-		dev->current_command = NULL;
-		mcp2210_process_commnds(dev);
-	}
-	
-	return;
-	
-err_free_node:
-	kfree(list_node);
-err_free_value:
-	kfree(field->value);
-err_free_field:
-	kfree(field);
-err_free_report:
-	kfree(report);
-	pending = dev->current_command->requests_pending;
-	if(pending == 0) {
-		if(dev->current_command->interrupted)
-			dev->current_command->interrupted(dev->current_command->data);
-						
-		list_del(&dev->current_command->node);
-			
-		kfree(dev->current_command);
-		dev->current_command = NULL;
-		mcp2210_process_commnds(dev);
-	}
-}
-
-int mcp2210_add_command(struct mcp2210_device *dev, void *cmd_data,
-		int (*next_request)(void *command_data, u8 *request),
-		void (*data_received)(void *command_data, u8 *response),
-		void (*interrupted)(void *command_data)) {
-	
-	struct mcp2210_command *cmd;
-		
-	spin_lock(&dev->command_lock);
-	//printk("mcp2210_add_command lock\n");	
-	
-	cmd = kzalloc(sizeof(struct mcp2210_command), GFP_KERNEL);
-	if (!cmd)
-		return -ENOMEM;
-	
-	cmd->data = cmd_data;
-	cmd->dev = dev;
-	cmd->next_request = next_request;
-	cmd->data_received = data_received;
-	cmd->interrupted = interrupted;	
-	
-	INIT_LIST_HEAD(&cmd->request_list);	
-	
-	list_add_tail(&cmd->node, &dev->command_list);
-	
-	
-	if(!dev->current_command) {
-		mcp2210_process_commnds(dev);
-	}
-	
-	//printk("mcp2210_add_command unlock\n");	
-	spin_unlock(&dev->command_lock);	
-		
-	return 0;
-}
-
-static void mcp2210_free_request(struct mcp2210_request_list *list_node) {
-	kfree(list_node->report->field[0]->value);
-	kfree(list_node->report->field[0]);
-	kfree(list_node->report);
-	list_del(&list_node->node);
-	kfree(list_node);
-}
-
-static int mcp2210_probe(struct hid_device *hdev,
-		const struct hid_device_id *id)
-{
-	int ret;
-	struct mcp2210_device *dev;
-	//struct info_command *cmd_data;
-	struct spi_master	*master;
-	struct mcp2210_spi *ms;
-	
-	dev = kzalloc(sizeof(struct mcp2210_device), GFP_KERNEL);
-	if (!dev)
-		return -ENOMEM;
+	};
 	
 	printk("%s\n", __func__);				
 	
-	hid_set_drvdata(hdev, dev);
-	dev->hid = hdev;
-	INIT_LIST_HEAD(&dev->command_list);	
-	mutex_init(&dev->command_mutex);
-	spin_lock_init(&dev->command_lock);
-	INIT_WORK(&dev->command_work, mcp2210_output_command);
-		
-	ret = hid_parse(hdev);
-	if (ret) {
-		dev_err(&hdev->dev, "parse failed\n");
-		goto err_free;
-	}
-	
-	ret = hid_hw_start(hdev, HID_CONNECT_DEFAULT);
-	if (ret) {
-		dev_err(&hdev->dev, "hw start failed\n");
-		goto err_free;
-	}
-	
-	if (hdev->ll_driver->power) {
-		ret = hdev->ll_driver->power(hdev, PM_HINT_FULLON);
-		if (ret < 0)
-			goto err_free;
-	}
-	ret = hdev->ll_driver->open(hdev);
-	if (ret < 0) {
-		if (hdev->ll_driver->power)
-			hdev->ll_driver->power(hdev, PM_HINT_NORMAL);
-			
-		goto err_free;
-	}	
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	if (!dev)
+		return -ENOMEM;
 
-	ret = -ENOMEM;
-	master = spi_alloc_master(&dev->hid->dev, sizeof *ms);	
+	dev->dev = &intf->dev;
+	usb_set_intfdata(intf, dev);
+
+	master = spi_alloc_master(dev->dev, 0);	
 	if (!master)
-		goto err_power;
-	
+		goto err_spi;
+
+	dev->master = master;	
 	master->bus_num = -1;
 	master->num_chipselect = 4;
 	master->setup = mcp2210_spi_setup;
 	master->transfer = mcp2210_spi_transfer;
 	master->cleanup = mcp2210_spi_cleanup;
 	master->mode_bits = SPI_CPOL | SPI_CPHA;
-		
-	ms = spi_master_get_devdata(master);
-	ms->dev = dev;	
-	ms->master = master;
-	dev->spi_data = ms;
+
+	spi_master_set_devdata(master, dev);
+	//ms = spi_master_get_devdata(master);
+	//ms->dev = dev;	
+	//ms->master = master;
+	//dev->spi_data = ms;
 	
 	ret = spi_register_master(master);
-	
-	demo_spi_devices[0].bus_num = master->bus_num;
-	printk("mcp2210 spi master registered bus number %d\n", demo_spi_devices[0].bus_num);
-	
-	spi_new_device(master, demo_spi_devices);
-	
 	if (ret)
 		goto err_power;
 	
-		/*
-	cmd_data = kzalloc(sizeof(struct info_command), GFP_KERNEL);
-	if (!cmd_data)
-		return -ENOMEM;
+	board_info.bus_num = master->bus_num;
+	printk("mcp2210 spi master registered bus number %d\n", board_info.bus_num);
 	
-	cmd_data->id = 1;
-	mcp2210_add_command(dev, cmd_data, next_mcp2210_info_command, next_mcp2210_info_command_data, mcp2210_info_command_interrupted);
+	spi_new_device(master, &board_info);
 	
-	
-	cmd_data = kzalloc(sizeof(struct info_command), GFP_KERNEL);
-	if (!cmd_data)
-		return -ENOMEM;
-	
-	cmd_data->id = 2;
-	mcp2210_add_command(dev, cmd_data, next_mcp2210_info_command, next_mcp2210_info_command_data, mcp2210_info_command_interrupted);
-	
-	
-	cmd_data = kzalloc(sizeof(struct info_command), GFP_KERNEL);
-	if (!cmd_data)
-		return -ENOMEM;
-	
-	cmd_data->id = 3;
-	mcp2210_add_command(dev, cmd_data, next_mcp2210_info_command, next_mcp2210_info_command_data, mcp2210_info_command_interrupted);
-	
-	*/
 	return 0;
 
 err_power:
-	if (hdev->ll_driver->power)
-		hdev->ll_driver->power(hdev, PM_HINT_NORMAL);
-	hdev->ll_driver->close(hdev);		
 	spi_master_put(master);
-err_free:
+err_spi:
 	kfree(dev);
-	return ret;
+	return -ENOMEM;
 }
 
-static void mcp2210_remove(struct hid_device *hdev)
+static void mcp2210_disconnect(struct usb_interface *intf)
 {
-	struct mcp2210_device *dev = hid_get_drvdata(hdev);
-	struct list_head *pos, *q, *request_pos, *request_q;
-	struct mcp2210_command *tmp;
-	struct mcp2210_spi *ms = dev->spi_data;
-	struct spi_master	*master = ms->master;	
+	struct mcp2210_device *dev = usb_get_intfdata(intf);
 	
-	list_for_each_safe(pos, q, &dev->command_list){
-		tmp = list_entry(pos, struct mcp2210_command, node);
-		list_del(pos);
-		
-		if(tmp->interrupted)
-			tmp->interrupted(tmp->data);
-		
-		list_for_each_safe(request_pos, request_q, &tmp->request_list) {
-			mcp2210_free_request(list_entry(request_pos, struct mcp2210_request_list, node));
-		}
-		
-		kfree(tmp);
-	}
+	printk("%s\n", __func__);
 	
-	spi_unregister_master(master);
+	spi_unregister_master(dev->master);
+	spi_master_put(dev->master);
 
-	if (hdev->ll_driver->power)
-		hdev->ll_driver->power(hdev, PM_HINT_NORMAL);
-	hdev->ll_driver->close(hdev);	
-	
+	usb_set_intfdata(intf, NULL);
 	kfree(dev);
-
-	printk("mcp2210_remove\n");
-	hid_hw_stop(hdev);
 }
 
-static const struct hid_device_id mcp2210_devices[] = {
-	{ HID_USB_DEVICE(USB_VENDOR_ID_MICROCHIP, USB_DEVICE_ID_MCP2210),
-		.driver_data = 0 },
-	{ }
+static const struct usb_device_id mcp2210_devices[] = {
+	{USB_DEVICE(USB_VENDOR_ID_MICROCHIP, USB_DEVICE_ID_MCP2210)},
+	{}
 };
 
-MODULE_DEVICE_TABLE(hid, mcp2210_devices);
+MODULE_DEVICE_TABLE(usb, mcp2210_devices);
 
-static struct hid_driver mcp2210_driver = {
+static struct usb_driver mcp2210_driver = {
 	.name = "mcp2210",
-	.id_table = mcp2210_devices,
 	.probe = mcp2210_probe,
-	.remove = mcp2210_remove
+	.disconnect = mcp2210_disconnect,
+	.id_table = mcp2210_devices,
 };
 
-module_hid_driver(mcp2210_driver);
+module_usb_driver(mcp2210_driver);
 MODULE_LICENSE("GPL");
