@@ -88,8 +88,8 @@ static int mcp2210_probe(struct usb_interface *intf,
 	static struct spi_board_info board_info = {
 		.modalias = "mrf24j40",
 		.bus_num = 0,
-		.chip_select = 0,
-		.max_speed_hz = MCP2210_MAX_SPEED,
+		.chip_select = 1,
+		.max_speed_hz =  8000000, /* 8MHz */
 		.mode = SPI_MODE_3,
 	};
 	
