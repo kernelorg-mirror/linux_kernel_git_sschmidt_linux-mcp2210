@@ -106,6 +106,24 @@ static int mcp2210_probe(struct usb_interface *intf,
 	if (!master)
 		goto err_spi;
 
+
+	/* TODO
+	 * 1) Setup GP0 or GP1 as chip select pins
+	 * 2) Setup GP6 as external interupt pin, if needed
+	 * 3) How to configure power up settings (PID/VID, string descriptors,
+	 *           chip settings and SPI transfer paramters-> NVRAM storage)
+	 *    -> Userspace libusb based config utility
+	 * 4) Setup GP2 for USB suspend and resume
+	 * 5) Go with USB bus powered only mode for now
+	 */
+
+
+	/* Default SPI config after reset
+	 * 1 Mbit
+	 * 4 bytes transfer per SPI transaction
+	 * GP1 as chip select line
+	 */
+
 	dev->master = master;	
 	master->bus_num = -1;
 	master->num_chipselect = 4;
