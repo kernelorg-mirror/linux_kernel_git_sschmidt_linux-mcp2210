@@ -49,7 +49,7 @@ if SPI_MASTER
 
 comment "SPI Master Controller Drivers"
 
-config MCP2210
+config SPI_MCP2210
 	tristate "MCP2210 usb to spi master"
 	depends on USB && SPI
 	help
