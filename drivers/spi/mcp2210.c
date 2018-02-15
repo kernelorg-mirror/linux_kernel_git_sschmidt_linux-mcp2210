@@ -23,8 +23,100 @@
 #define USB_VENDOR_ID_MICROCHIP		0x04d8
 #define USB_DEVICE_ID_MCP2210		0x00de
 
-#define MCP2210_BUFFER_SIZE		64
+/* Product page: http://www.microchip.com/wwwproducts/en/MCP2210
+ * Datasheet 2011-12-14: http://ww1.microchip.com/downloads/en/DeviceDoc/22288A.pdf
+ */
+#define MCP2210_BUFFER_SIZE	64
 #define MCP2210_MAX_SPEED	(12 * 1000 * 1000)
+#define MCP2210_MIN_SPEED	1500
+#define MCP2210_EEPROM_SIZE	256
+#define MCP2210_NUM_PINS	9
+
+/* Command codes */
+#define MCP2210_CMD_GET_STATUS		0x10 /* Section 3.6.1 */
+#define MCP2210_CMD_SPI_CANCEL		0x11 /* Section 3.5.2 */
+#define MCP2210_CMD_GET_INTERRUPTS	0x12 /* Section 3.4.1 */
+#define MCP2210_CMD_GET_GPIO_CONFIG	0x20 /* Section 3.2.3 */
+#define MCP2210_CMD_SET_GPIO_CONFIG	0x21 /* Section 3.2.4 */
+#define MCP2210_CMD_SET_PIN_VALUE	0x30 /* Section 3.2.8 */
+#define MCP2210_CMD_GET_PIN_VALUE	0x31 /* Section 3.2.7 */
+#define MCP2210_CMD_SET_PIN_DIR		0x32 /* Section 3.2.6 */
+#define MCP2210_CMD_GET_PIN_DIR		0x33 /* Section 3.2.5 */
+#define MCP2210_CMD_SET_SPI_CONFIG	0x40 /* Section 3.2.2 */
+#define MCP2210_CMD_GET_SPI_CONFIG	0x41 /* Section 3.2.1 */
+#define MCP2210_CMD_SPI_TRANSFER	0x42 /* Section 3.5.1 */
+#define MCP2210_CMD_READ_EEPROM		0x50 /* Section 3.3.1 */
+#define MCP2210_CMD_WRITE_EEPROM	0x51 /* Section 3.3.2 */
+#define MCP2210_CMD_SET_NVRAM		0x60 /* Section 3.1.1 - 3.1.5 */
+#define MCP2210_CMD_GET_NVRAM		0x61 /* Section 3.1.6 - 3.1.10 */
+#define MCP2210_CMD_SEND_PASSWORD	0x70 /* Section 3.1.11 */
+#define MCP2210_CMD_SPI_RELEASE		0x80 /* Section 3.5.3 */
+
+/* Subcommand codes */
+#define MCP2210_NVRAM_SPI		0x10
+#define MCP2210_NVRAM_GPIO		0x20
+#define MCP2210_NVRAM_USB		0x30
+#define MCP2210_NVRAM_PROD_NAME		0x40
+#define MCP2210_NVRAM_MF_NAME		0x50
+
+/* Status codes */
+#define MCP2210_STATUS_SUCCESS		0x00
+#define MCP2210_STATUS_SPI_NOT_OWNED	0xF7
+#define MCP2210_STATUS_BUSY		0xF8
+#define MCP2210_STATUS_UNKNOWN_CMD	0xF9
+#define MCP2210_STATUS_WRITE_FAIL	0xFA
+#define MCP2210_STATUS_BLOCKED_ACCESS	0xFB
+#define MCP2210_STATUS_PERM_LOCKED	0xFC
+#define MCP2210_STATUS_BAD_PASSWORD	0xFD
+
+/* Multi function pin modes */
+#define	MCP2210_PIN_GPIO	0
+#define MCP2210_PIN_CS		1
+#define MCP2210_PIN_DEDICATED	2
+
+/* GPIO direction */
+#define MCP2210_GPIO_NO_CHANGE -1
+#define MCP2210_GPIO_OUTPUT	0
+#define MCP2210_GPIO_INPUT	1
+
+/**
+ * enum mcp2210_other_settings
+ *
+ * Represents byte 17 of chip settings message (section 3.1.1, 3.1.2, etc)
+ *
+ * These values are generally ORed together except that only one
+ * MCP2210_INTERRUPT_* value may be chosen (they do not OR together). To disable
+ * any of these options, exclude them (zero is "disabled" for all options).
+ * See table 3-1 in the datasheet for more information.
+ */
+#define MCP2210_SPI_BUS_RELEASE_DISABLED	0x01
+#define MCP2210_INTERRUPT_HIGH_PULSE		0x08
+#define MCP2210_INTERRUPT_LOW_PULSE		0x06
+#define MCP2210_INTERRUPT_RISING_EDGE		0x04
+#define MCP2210_INTERRUPT_FALLING_EDGE		0x02
+#define MCP2210_REMOTE_WAKEUP_ENABLED		0x80
+
+#define MCP2210_EEPROM_UNREAD		0
+#define MCP2210_EEPROM_READ_PENDING	1
+#define MCP2210_EEPROM_READ		2
+#define MCP2210_EEPROM_DIRTY		3
+
+#define EP_OUT	0
+#define EP_IN	1
+
+enum mcp2210_cmd_type_id {
+	MCP2210_CMD_TYPE_CTL,
+	MCP2210_CMD_TYPE_SPI,
+	MCP2210_CMD_TYPE_EEPROM,
+	MCP2210_CMD_TYPE_MAX
+};
+
+enum mcp2210_urb_cmd_state {
+	MCP2210_STATE_NEW,
+	MCP2210_STATE_SUBMITTED,
+	MCP2210_STATE_COMPLETE,
+	MCP2210_STATE_DEAD
+};
 
 struct mcp2210_device {
 	struct device *dev;
