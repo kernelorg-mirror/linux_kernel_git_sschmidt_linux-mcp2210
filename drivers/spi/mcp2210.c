@@ -1,7 +1,11 @@
 /*
- *  MCP 2210 driver for linux
+ *  MCP2210 driver for linux
  *
+ *  Copyright (c) 2018 Stefan Schmidt <stefan@datenfreihafen.org>
+ *
+ *  Based on other drivers with following copyright:
  *  Copyright (c) 2013 Mathew King <mking@trilithic.com> for Trilithic, Inc
+ *  Copyright (c) 2013-2017 Daniel Santos <daniel.santos@pobox.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -184,4 +188,6 @@ static struct usb_driver mcp2210_driver = {
 };
 
 module_usb_driver(mcp2210_driver);
-MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Stefan Schmidt <stefan@datenfreihafen.org>");
+MODULE_DESCRIPTION("Microchip MCP2210 USB-to-SPI bridge");
+MODULE_LICENSE("GPLv2");
