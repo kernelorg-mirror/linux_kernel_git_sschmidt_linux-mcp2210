@@ -104,13 +104,6 @@
 #define EP_OUT	0
 #define EP_IN	1
 
-enum mcp2210_cmd_type_id {
-	MCP2210_CMD_TYPE_CTL,
-	MCP2210_CMD_TYPE_SPI,
-	MCP2210_CMD_TYPE_EEPROM,
-	MCP2210_CMD_TYPE_MAX
-};
-
 enum mcp2210_urb_cmd_state {
 	MCP2210_STATE_NEW,
 	MCP2210_STATE_SUBMITTED,
@@ -121,6 +114,7 @@ enum mcp2210_urb_cmd_state {
 struct mcp2210_device {
 	struct device *dev;
 	struct spi_master *master;
+	struct usb_device *usbdev;
 	u8 requeust_buffer[MCP2210_BUFFER_SIZE];
 	void *spi_data;
 };
@@ -141,6 +135,75 @@ struct mcp2210_spi_message {
 	unsigned int kill;
 	struct list_head *next;
 };
+
+/***** USB handling *****/
+#define ATUSB_REQ_FROM_DEV      (USB_TYPE_VENDOR | USB_DIR_IN)
+#define ATUSB_REQ_TO_DEV        (USB_TYPE_VENDOR | USB_DIR_OUT)
+
+static int atusb_control_msg(struct mcp2210_device *atusb, unsigned int pipe,
+				__u8 request, __u8 requesttype,
+				__u16 value, __u16 index,
+				void *data, __u16 size, int timeout)
+{
+	struct usb_device *usbdev = atusb->usbdev;
+	int ret;
+
+	ret = usb_control_msg(usbdev, pipe, request, requesttype,
+				value, index, data, size, timeout);
+	if (ret < 0) {
+		dev_err(&usbdev->dev,
+		"%s: req 0x%02x val 0x%x idx 0x%x, error %d\n",
+		__func__, request, value, index, ret);
+	}
+	return ret;
+}
+
+static int atusb_command(struct mcp2210_device *atusb, u8 cmd, u8 arg)
+{
+	struct usb_device *usbdev = atusb->usbdev;
+
+	dev_dbg(&usbdev->dev, "%s: cmd = 0x%x\n", __func__, cmd);
+	return atusb_control_msg(atusb, usb_sndctrlpipe(usbdev, 0),
+				cmd, ATUSB_REQ_TO_DEV, arg, 0, NULL, 0, 1000);
+}
+
+static int atusb_write_reg(struct mcp2210_device *atusb, u8 reg, u8 value)
+{
+	struct usb_device *usbdev = atusb->usbdev;
+
+	dev_dbg(&usbdev->dev, "%s: 0x%02x <- 0x%02x\n", __func__, reg, value);
+	return atusb_control_msg(atusb, usb_sndctrlpipe(usbdev, 0),
+				0x20, ATUSB_REQ_TO_DEV,
+				value, reg, NULL, 0, 1000);
+}
+
+static int atusb_read_reg(struct mcp2210_device *atusb, u8 reg)
+{
+	struct usb_device *usbdev = atusb->usbdev;
+	int ret;
+	u8 *buffer;
+	u8 value;
+
+	buffer = kmalloc(1, GFP_KERNEL);
+	if (!buffer)
+		return -ENOMEM;
+
+	dev_dbg(&usbdev->dev, "%s: reg = 0x%x\n", __func__, reg);
+	ret = atusb_control_msg(atusb, usb_rcvctrlpipe(usbdev, 0),
+				0x21, ATUSB_REQ_FROM_DEV,
+				0, reg, buffer, 1, 1000);
+
+	if (ret >= 0) {
+		value = buffer[0];
+		kfree(buffer);
+		return value;
+	} else {
+		kfree(buffer);
+		return ret;
+	}
+}
+
+/***** SPI master handling *****/
 
 static int mcp2210_spi_setup(struct spi_device *spi)
 {
@@ -174,9 +237,13 @@ static void mcp2210_spi_cleanup(struct spi_device *spi)
 	ms = spi_master_get_devdata(spi->master);
 }
 
+
+/***** Module setup, probe and disconnect *****/
+
 static int mcp2210_probe(struct usb_interface *intf,
 		const struct usb_device_id *id)
 {
+	struct usb_device *udev = interface_to_usbdev(intf);
 	struct mcp2210_device *dev;
 	struct mcp2210_spi *ms;
 	struct spi_master *master;
