@@ -1,5 +1,5 @@
 /*
- *  MCP2210 driver for linux
+ *  MCP2210 USB to SPI bridge driver
  *
  *  Copyright (c) 2018 Stefan Schmidt <stefan@datenfreihafen.org>
  *
