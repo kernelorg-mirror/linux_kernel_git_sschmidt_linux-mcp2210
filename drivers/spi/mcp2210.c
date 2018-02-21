@@ -115,6 +115,8 @@ struct mcp2210_device {
 	struct device *dev;
 	struct spi_master *master;
 	struct usb_device *usbdev;
+	struct usb_host_endpoint *ep_in;
+	struct usb_host_endpoint *ep_out;
 	u8 requeust_buffer[MCP2210_BUFFER_SIZE];
 	void *spi_data;
 };
@@ -137,70 +139,56 @@ struct mcp2210_spi_message {
 };
 
 /***** USB handling *****/
-#define ATUSB_REQ_FROM_DEV      (USB_TYPE_VENDOR | USB_DIR_IN)
-#define ATUSB_REQ_TO_DEV        (USB_TYPE_VENDOR | USB_DIR_OUT)
 
-static int atusb_control_msg(struct mcp2210_device *atusb, unsigned int pipe,
-				__u8 request, __u8 requesttype,
-				__u16 value, __u16 index,
-				void *data, __u16 size, int timeout)
+/* 1 configuration -> 1 interface (HID) -> 2 endpoints (1 in, 1 out) */
+
+static void rx_urb(struct urb *urb)
 {
-	struct usb_device *usbdev = atusb->usbdev;
-	int ret;
+	struct mcp2210_device *dev = urb->context;
 
-	ret = usb_control_msg(usbdev, pipe, request, requesttype,
-				value, index, data, size, timeout);
-	if (ret < 0) {
-		dev_err(&usbdev->dev,
-		"%s: req 0x%02x val 0x%x idx 0x%x, error %d\n",
-		__func__, request, value, index, ret);
+	printk("%s\n", __func__);				
+}
+
+static int mcp2210_usb_init(struct mcp2210_device *dev, struct usb_interface *intf)
+{
+	struct usb_host_interface *intf_desc = intf->cur_altsetting;
+	struct usb_host_endpoint *ep, *ep_end;
+	struct usb_device *udev = interface_to_usbdev(intf);
+	int pipe;
+	struct urb *urb_in, *urb_out;
+	u8 *inbuf, *outbuf;
+
+	ep_end = &intf_desc->endpoint[intf_desc->desc.bNumEndpoints];
+	for (ep = intf_desc->endpoint; ep != ep_end; ep++) {
+		if (!usb_endpoint_xfer_int(&ep->desc))
+			continue;
+
+		if (usb_endpoint_dir_in(&ep->desc)) {
+			dev->ep_in = ep;
+			pipe = usb_rcvintpipe(udev, ep->desc.bEndpointAddress);
+			printk("%s Found IN endpoint at address %x\n", __func__, ep->desc.bEndpointAddress);
+			urb_in = usb_alloc_urb(0, GFP_KERNEL);
+			inbuf = kzalloc(64, GFP_KERNEL);
+			usb_fill_int_urb(urb_in, udev, pipe, inbuf, 64,
+					rx_urb, dev, ep->desc.bInterval);
+			//urb_in->transfer_dma = usbhid->inbuf_dma;
+			urb_in->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+		} else {
+			dev->ep_out = ep;
+			pipe = usb_sndintpipe(udev, ep->desc.bEndpointAddress);
+			printk("%s Found OUT endpoint at address %x\n", __func__, ep->desc.bEndpointAddress);
+			urb_out = usb_alloc_urb(0, GFP_KERNEL);
+			outbuf = kzalloc(64, GFP_KERNEL);
+			usb_fill_int_urb(urb_out, udev, pipe, outbuf, 64,
+					rx_urb, dev, ep->desc.bInterval);
+			//urb_out->transfer_dma = usbhid->outbuf_dma;
+			urb_out->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
+		}
 	}
-	return ret;
-}
-
-static int atusb_command(struct mcp2210_device *atusb, u8 cmd, u8 arg)
-{
-	struct usb_device *usbdev = atusb->usbdev;
-
-	dev_dbg(&usbdev->dev, "%s: cmd = 0x%x\n", __func__, cmd);
-	return atusb_control_msg(atusb, usb_sndctrlpipe(usbdev, 0),
-				cmd, ATUSB_REQ_TO_DEV, arg, 0, NULL, 0, 1000);
-}
-
-static int atusb_write_reg(struct mcp2210_device *atusb, u8 reg, u8 value)
-{
-	struct usb_device *usbdev = atusb->usbdev;
-
-	dev_dbg(&usbdev->dev, "%s: 0x%02x <- 0x%02x\n", __func__, reg, value);
-	return atusb_control_msg(atusb, usb_sndctrlpipe(usbdev, 0),
-				0x20, ATUSB_REQ_TO_DEV,
-				value, reg, NULL, 0, 1000);
-}
-
-static int atusb_read_reg(struct mcp2210_device *atusb, u8 reg)
-{
-	struct usb_device *usbdev = atusb->usbdev;
-	int ret;
-	u8 *buffer;
-	u8 value;
-
-	buffer = kmalloc(1, GFP_KERNEL);
-	if (!buffer)
-		return -ENOMEM;
-
-	dev_dbg(&usbdev->dev, "%s: reg = 0x%x\n", __func__, reg);
-	ret = atusb_control_msg(atusb, usb_rcvctrlpipe(usbdev, 0),
-				0x21, ATUSB_REQ_FROM_DEV,
-				0, reg, buffer, 1, 1000);
-
-	if (ret >= 0) {
-		value = buffer[0];
-		kfree(buffer);
-		return value;
-	} else {
-		kfree(buffer);
-		return ret;
-	}
+	inbuf[0] = MCP2210_CMD_GET_NVRAM;
+	inbuf[1] = MCP2210_NVRAM_SPI;
+	inbuf[2] = 0x00;
+	usb_submit_urb(urb_in, GFP_ATOMIC);
 }
 
 /***** SPI master handling *****/
@@ -262,8 +250,15 @@ static int mcp2210_probe(struct usb_interface *intf,
 	if (!dev)
 		return -ENOMEM;
 
+	mcp2210_usb_init(dev, intf);
+
 	dev->dev = &intf->dev;
 	usb_set_intfdata(intf, dev);
+
+
+	
+	//mcp2210_add_ctl_cmd(dev, MCP2210_CMD_GET_GPIO_CONFIG, 0, NULL, 0, false, GFP_KERNEL);
+
 
 	master = spi_alloc_master(dev->dev, 0);	
 	if (!master)
@@ -308,7 +303,7 @@ static int mcp2210_probe(struct usb_interface *intf,
 	board_info.bus_num = master->bus_num;
 	printk("mcp2210 spi master registered bus number %d\n", board_info.bus_num);
 	
-	spi_new_device(master, &board_info);
+	//spi_new_device(master, &board_info);
 	
 	return 0;
 
@@ -349,4 +344,4 @@ static struct usb_driver mcp2210_driver = {
 module_usb_driver(mcp2210_driver);
 MODULE_AUTHOR("Stefan Schmidt <stefan@datenfreihafen.org>");
 MODULE_DESCRIPTION("Microchip MCP2210 USB-to-SPI bridge");
-MODULE_LICENSE("GPLv2");
+MODULE_LICENSE("GPL v2");
